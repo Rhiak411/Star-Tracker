@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Command Log">
+<meta name="theme-color" content="#050810">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Command Log — STF</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050810;
+  --bg2: #0a0f1e;
+  --bg3: #0f1628;
+  --panel: #0d1530;
+  --border: #1e3060;
+  --border-bright: #2a4a8a;
+  --accent: #3a8fff;
+  --accent2: #00d4ff;
+  --accent3: #ff6b35;
+  --green: #00ff9d;
+  --yellow: #ffd166;
+  --red: #ff4757;
+  --purple: #a855f7;
+  --text: #c8d8f8;
+  --text-dim: #5a7aaa;
+  --text-bright: #e8f0ff;
+  --mono: 'Share Tech Mono', monospace;
+  --display: 'Orbitron', monospace;
+  --body: 'Exo 2', sans-serif;
+  --nav-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: var(--body); overscroll-behavior: none; }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 10%, rgba(58,143,255,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 90%, rgba(0,212,255,0.04) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+
+.app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; height: 100dvh; }
+
+/* HEADER */
+header {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+}
+.logo-block h1 { font-family: var(--display); font-size: 1.1rem; font-weight: 900; color: var(--accent2); letter-spacing: 0.1em; text-shadow: 0 0 16px rgba(0,212,255,0.5); }
+.logo-block p { font-family: var(--mono); font-size: 0.55rem; color: var(--text-dim); letter-spacing: 0.15em; margin-top: 2px; }
+.active-pill { font-family: var(--mono); font-size: 0.6rem; color: var(--text-dim); letter-spacing: 0.08em; }
+.active-pill strong { font-family: var(--display); font-size: 0.9rem; color: var(--yellow); margin-right: 2px; }
+
+/* SCROLL AREA */
+.scroll-area { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding: 12px 12px 8px; }
+
+/* SECTIONS */
+.section { display: none; }
+.section.active { display: block; animation: fadeIn 0.25s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 2px; }
+.section-title { font-family: var(--display); font-size: 0.65rem; letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; }
+
+/* CARDS */
+.cards-list { display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 2px; overflow: hidden; }
+.card-tap { padding: 13px 14px 0; cursor: pointer; user-select: none; }
+.card-tap:active { opacity: 0.82; }
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.card-title { font-family: var(--display); font-size: 0.82rem; font-weight: 700; color: var(--text-bright); letter-spacing: 0.04em; line-height: 1.3; }
+.card-sub { font-family: var(--mono); font-size: 0.6rem; color: var(--text-dim); margin-top: 3px; letter-spacing: 0.08em; }
+.card-badges { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; align-items: flex-start; }
+.card-chevron { font-size: 0.5rem; color: var(--text-dim); align-self: center; margin-left: 2px; transition: transform 0.2s; flex-shrink: 0; }
+.card-chevron.open { transform: rotate(180deg); }
+.card-preview { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 0 12px; }
+.preview-item { font-size: 0.7rem; color: var(--text-dim); }
+.preview-item strong { color: var(--text); font-weight: 600; }
+.card-detail { display: none; padding: 4px 14px 4px; border-top: 1px solid var(--border); }
+.card-detail.open { display: block; }
+.detail-row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(30,48,96,0.5); font-size: 0.76rem; align-items: flex-start; }
+.detail-row:last-child { border-bottom: none; }
+.detail-label { font-family: var(--mono); font-size: 0.58rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; min-width: 76px; flex-shrink: 0; padding-top: 1px; }
+.detail-val { color: var(--text); flex: 1; word-break: break-word; line-height: 1.5; }
+.note-box { background: var(--bg3); border-left: 2px solid var(--border-bright); padding: 8px 10px; font-size: 0.72rem; color: var(--text-dim); font-style: italic; line-height: 1.5; margin: 4px 0 8px; }
+.card-actions-bar { display: flex; border-top: 1px solid var(--border); }
+.card-action-btn { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-dim); font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.card-action-btn:active { background: rgba(255,255,255,0.04); }
+.card-action-btn.edit:active { color: var(--accent); }
+.card-action-btn.del:active { color: var(--red); }
+.card-action-btn + .card-action-btn { border-left: 1px solid var(--border); }
+.rep-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.rep-bar-bg { flex: 1; height: 5px; background: var(--bg3); border: 1px solid var(--border); position: relative; overflow: hidden; }
+.rep-bar-fill { position: absolute; top: 0; height: 100%; left: 0; }
+.rep-val { font-family: var(--mono); font-size: 0.65rem; min-width: 30px; text-align: right; }
+.crew-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* BADGES */
+.badge { display: inline-block; font-family: var(--mono); font-size: 0.57rem; letter-spacing: 0.08em; padding: 2px 7px; border: 1px solid; text-transform: uppercase; border-radius: 1px; white-space: nowrap; }
+.badge-blue   { color: var(--accent2); border-color: rgba(0,212,255,0.35); background: rgba(0,212,255,0.07); }
+.badge-green  { color: var(--green);   border-color: rgba(0,255,157,0.35); background: rgba(0,255,157,0.07); }
+.badge-yellow { color: var(--yellow);  border-color: rgba(255,209,102,0.35); background: rgba(255,209,102,0.07); }
+.badge-red    { color: var(--red);     border-color: rgba(255,71,87,0.35); background: rgba(255,71,87,0.07); }
+.badge-purple { color: var(--purple);  border-color: rgba(168,85,247,0.35); background: rgba(168,85,247,0.07); }
+.badge-orange { color: var(--accent3); border-color: rgba(255,107,53,0.35); background: rgba(255,107,53,0.07); }
+
+/* EMPTY STATE */
+.empty-state { text-align: center; padding: 52px 20px; border: 1px dashed var(--border); margin-top: 8px; }
+.empty-icon { font-size: 2rem; margin-bottom: 10px; opacity: 0.35; }
+.empty-text { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; }
+
+/* ── MAP SECTION ── */
+#section-map { display: none; flex-direction: column; height: 100%; }
+#section-map.active { display: flex; }
+
+.map-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 10px;
+  flex-wrap: wrap;
+}
+
+.map-mode-btn {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.map-mode-btn.active { background: rgba(58,143,255,0.15); border-color: var(--accent); color: var(--accent2); }
+.map-mode-btn:active { opacity: 0.75; }
+
+.map-hint {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  flex: 1;
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.map-scroll-wrap {
+  flex: 1;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+/* SVG connection layer */
+#map-svg {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Grid */
+.map-grid {
+  position: relative;
+  display: grid;
+  z-index: 2;
+  /* set by JS */
+}
+
+.map-cell {
+  width: 56px;
+  height: 52px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* empty cell dot */
+.map-cell::after {
+  content: '';
+  width: 4px; height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.map-cell.has-node::after { display: none; }
+
+/* NODE */
+.map-node {
+  position: absolute;
+  inset: 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border-bright);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  z-index: 3;
+  cursor: pointer;
+}
+
+.map-node:active { transform: scale(0.96); }
+
+.map-node.selected {
+  border-color: var(--accent2);
+  box-shadow: 0 0 10px rgba(0,212,255,0.35);
+}
+
+.map-node.connect-source {
+  border-color: var(--yellow);
+  box-shadow: 0 0 10px rgba(255,209,102,0.4);
+}
+
+.node-name {
+  font-family: var(--mono);
+  font-size: 0.42rem;
+  color: var(--text-bright);
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.2;
+  padding: 0 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-port-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--accent2);
+  flex-shrink: 0;
+}
+
+.node-hazard-pip {
+  position: absolute;
+  bottom: 2px; right: 2px;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+}
+
+/* faction colors for node border-top */
+.node-f-none    { border-top: 2px solid var(--border-bright); }
+.node-f-templar { border-top: 2px solid #a855f7; }
+.node-f-isc     { border-top: 2px solid #3a8fff; }
+.node-f-pirates { border-top: 2px solid #ff4757; }
+.node-f-frontier{ border-top: 2px solid #ff6b35; }
+.node-f-cadar   { border-top: 2px solid #ffd166; }
+.node-f-rychart { border-top: 2px solid #00ff9d; }
+.node-f-custom1 { border-top: 2px solid #e879f9; }
+.node-f-custom2 { border-top: 2px solid #38bdf8; }
+
+/* hazard pip colors */
+.hz-0 { background: var(--green); }
+.hz-1 { background: var(--yellow); }
+.hz-2 { background: var(--accent3); }
+.hz-3 { background: var(--red); }
+
+/* connection line */
+.map-connection { stroke-width: 2; opacity: 0.55; }
+
+/* MAP LEGEND */
+.map-legend {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 0 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.legend-swatch {
+  width: 10px; height: 10px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* ── NODE SHEET (map) ── */
+.node-sheet-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(5,8,16,0.75);
+  z-index: 50;
+  align-items: flex-end;
+  justify-content: center;
+}
+.node-sheet-overlay.open { display: flex; }
+.node-sheet {
+  width: 100%;
+  max-height: 90dvh;
+  background: var(--bg2);
+  border-top: 2px solid var(--accent2);
+  display: flex; flex-direction: column;
+  animation: sheetUp 0.28s cubic-bezier(0.32,0.72,0,1);
+  overflow: hidden;
+}
+@keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-handle { width: 36px; height: 4px; background: var(--border-bright); border-radius: 2px; margin: 10px auto 4px; flex-shrink: 0; }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sheet-title { font-family: var(--display); font-size: 0.72rem; letter-spacing: 0.18em; color: var(--accent2); text-transform: uppercase; }
+.sheet-close { width: 36px; height: 36px; background: var(--bg3); border: 1px solid var(--border); color: var(--text-dim); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; border-radius: 2px; }
+.sheet-body { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; padding: 16px; }
+.sheet-footer { flex-shrink: 0; padding: 12px 16px; padding-bottom: calc(12px + var(--safe-bottom)); border-top: 1px solid var(--border); display: flex; gap: 10px; }
+
+/* FORM */
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.15em; color: var(--text-dim); text-transform: uppercase; margin-bottom: 6px; }
+.form-input, .form-select, .form-textarea { width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text-bright); padding: 12px 14px; font-family: var(--body); font-size: 16px; outline: none; appearance: none; -webkit-appearance: none; border-radius: 2px; transition: border-color 0.2s; }
+.form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent); }
+.form-textarea { resize: vertical; min-height: 80px; }
+.form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%235a7aaa' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+.form-select option { background: var(--bg2); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input[type="range"] { -webkit-appearance: none; width: 100%; height: 6px; background: var(--bg3); border: 1px solid var(--border); outline: none; border-radius: 3px; margin-top: 4px; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; background: var(--accent); border-radius: 12px; cursor: pointer; border: 2px solid var(--bg); }
+.range-display { font-family: var(--display); font-size: 1rem; color: var(--accent2); text-align: center; display: block; margin-bottom: 6px; }
+
+/* Buttons */
+.btn-primary { flex: 1; font-family: var(--display); font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 15px; background: var(--accent); border: none; color: var(--bg); cursor: pointer; font-weight: 700; border-radius: 2px; }
+.btn-primary:active { background: var(--accent2); }
+.btn-secondary { font-family: var(--display); font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 15px 20px; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; border-radius: 2px; }
+.btn-secondary:active { border-color: var(--red); color: var(--red); }
+.btn-danger { font-family: var(--display); font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 15px 20px; background: transparent; border: 1px solid rgba(255,71,87,0.4); color: var(--red); cursor: pointer; border-radius: 2px; }
+.btn-danger:active { background: rgba(255,71,87,0.1); }
+
+/* BOTTOM NAV */
+.bottom-nav { flex-shrink: 0; display: flex; background: var(--bg2); border-top: 1px solid var(--border); padding-bottom: var(--safe-bottom); position: relative; z-index: 10; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 4px; background: transparent; border: none; cursor: pointer; color: var(--text-dim); transition: color 0.15s; min-height: var(--nav-h); position: relative; }
+.nav-btn::before { content: ''; position: absolute; top: 0; left: 15%; right: 15%; height: 2px; background: var(--accent2); transform: scaleX(0); transition: transform 0.2s ease; border-radius: 0 0 2px 2px; }
+.nav-btn.active { color: var(--accent2); }
+.nav-btn.active::before { transform: scaleX(1); }
+.nav-btn:active { opacity: 0.7; }
+.nav-icon { font-size: 1.25rem; line-height: 1; }
+.nav-label { font-family: var(--display); font-size: 0.48rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.nav-count { position: absolute; top: 7px; right: calc(50% - 18px); background: var(--accent); color: var(--bg); font-family: var(--mono); font-size: 0.5rem; font-weight: 700; min-width: 14px; height: 14px; border-radius: 7px; display: flex; align-items: center; justify-content: center; padding: 0 3px; opacity: 0; transition: opacity 0.2s; }
+.nav-count.visible { opacity: 1; }
+
+/* FAB */
+.fab { position: fixed; bottom: calc(var(--nav-h) + var(--safe-bottom) + 14px); right: 16px; width: 52px; height: 52px; border-radius: 26px; background: var(--accent); border: none; color: var(--bg); font-size: 1.5rem; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 20px rgba(58,143,255,0.45); z-index: 9; transition: transform 0.15s, box-shadow 0.15s; line-height: 1; }
+.fab:active { transform: scale(0.93); }
+.fab.hidden { display: none; }
+
+/* DESKTOP */
+@media (min-width: 640px) {
+  .app { max-width: 820px; margin: 0 auto; }
+  .scroll-area { padding: 16px; }
+  .cards-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .node-sheet { max-width: 520px; border-radius: 4px 4px 0 0; }
+  .fab { right: calc(50% - 410px + 16px); }
+  .form-input, .form-select, .form-textarea { font-size: 0.9rem; }
+  .map-cell { width: 64px; height: 60px; }
+}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-block">
+      <h1>⬡ Command Log</h1>
+      <p>// STAR TRADERS: FRONTIERS</p>
+    </div>
+    <div id="active-pill" class="active-pill"></div>
+  </header>
+
+  <div class="scroll-area" id="scroll-area">
+    <div id="section-ships" class="section active">
+      <div class="section-header"><span class="section-title">// Fleet Registry</span></div>
+      <div class="cards-list" id="ships-list"></div>
+    </div>
+    <div id="section-trade" class="section">
+      <div class="section-header"><span class="section-title">// Trade Routes</span></div>
+      <div class="cards-list" id="trade-list"></div>
+    </div>
+    <div id="section-factions" class="section">
+      <div class="section-header"><span class="section-title">// Faction Intel</span></div>
+      <div class="cards-list" id="factions-list"></div>
+    </div>
+    <div id="section-missions" class="section">
+      <div class="section-header"><span class="section-title">// Mission Dossiers</span></div>
+      <div class="cards-list" id="missions-list"></div>
+    </div>
+  </div>
+
+  <!-- MAP SECTION (outside scroll-area, full height flex) -->
+  <div id="section-map" class="section" style="padding: 10px 12px 8px; flex-direction: column; overflow: hidden;">
+    <div class="map-toolbar" id="map-toolbar">
+      <button class="map-mode-btn active" id="mode-place" onclick="setMapMode('place')">☉ Place</button>
+      <button class="map-mode-btn" id="mode-connect" onclick="setMapMode('connect')">⟵ Connect</button>
+      <button class="map-mode-btn" id="mode-delete" onclick="setMapMode('delete')">✕ Erase</button>
+      <span class="map-hint" id="map-hint">Tap a cell to place a system</span>
+    </div>
+    <div class="map-scroll-wrap" id="map-scroll-wrap">
+      <svg id="map-svg"></svg>
+      <div class="map-grid" id="map-grid"></div>
+    </div>
+    <div class="map-legend" id="map-legend"></div>
+  </div>
+
+  <button class="fab" id="fab-btn">+</button>
+
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="ships">
+      <span class="nav-icon">🚀</span><span class="nav-label">Ships</span>
+      <span class="nav-count" id="nc-ships"></span>
+    </button>
+    <button class="nav-btn" data-tab="trade">
+      <span class="nav-icon">📦</span><span class="nav-label">Trade</span>
+      <span class="nav-count" id="nc-trade"></span>
+    </button>
+    <button class="nav-btn" data-tab="factions">
+      <span class="nav-icon">⚔️</span><span class="nav-label">Factions</span>
+      <span class="nav-count" id="nc-factions"></span>
+    </button>
+    <button class="nav-btn" data-tab="missions">
+      <span class="nav-icon">📋</span><span class="nav-label">Missions</span>
+      <span class="nav-count" id="nc-missions"></span>
+    </button>
+    <button class="nav-btn" data-tab="map">
+      <span class="nav-icon">🗺️</span><span class="nav-label">Map</span>
+      <span class="nav-count" id="nc-map"></span>
+    </button>
+  </nav>
+</div>
+
+<!-- ENTRY SHEET (ships/trade/factions/missions) -->
+<div class="node-sheet-overlay" id="sheet-overlay">
+  <div class="node-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span class="sheet-title" id="sheet-title">New Entry</span>
+      <button class="sheet-close" id="sheet-close-btn">✕</button>
+    </div>
+    <div class="sheet-body" id="sheet-form"></div>
+    <div class="sheet-footer">
+      <button class="btn-secondary" id="sheet-cancel-btn">Cancel</button>
+      <button class="btn-primary" id="sheet-save-btn">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- NODE SHEET (map) -->
+<div class="node-sheet-overlay" id="node-sheet-overlay">
+  <div class="node-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span class="sheet-title" id="node-sheet-title">System</span>
+      <button class="sheet-close" onclick="closeNodeSheet()">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-group"><label class="form-label">System Name *</label><input class="form-input" id="ns-name" placeholder="e.g. Forge Station" autocomplete="off"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Faction Control</label>
+          <select class="form-select" id="ns-faction">
+            <option value="none">None / Unknown</option>
+            <option value="templar">Templars</option>
+            <option value="isc">ISC</option>
+            <option value="pirates">Pirates</option>
+            <option value="frontier">Frontier Militia</option>
+            <option value="cadar">Cadar</option>
+            <option value="rychart">Rychart</option>
+            <option value="custom1">Custom 1</option>
+            <option value="custom2">Custom 2</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Hazard Level</label>
+          <select class="form-select" id="ns-hazard">
+            <option value="0">Safe (0)</option>
+            <option value="1">Low (1)</option>
+            <option value="2">Medium (2)</option>
+            <option value="3">Danger (3)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Port / Station Present</label>
+        <select class="form-select" id="ns-port">
+          <option value="none">No Port</option>
+          <option value="trade">Trade Port</option>
+          <option value="military">Military Port</option>
+          <option value="outpost">Outpost</option>
+          <option value="capital">Capital</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="ns-notes" placeholder="Intel, prices, contacts..."></textarea></div>
+    </div>
+    <div class="sheet-footer" id="node-sheet-footer">
+      <button class="btn-danger" id="node-delete-btn">Delete</button>
+      <button class="btn-secondary" onclick="closeNodeSheet()">Cancel</button>
+      <button class="btn-primary" onclick="saveNode()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════
+const storage = { ships: [], trade: [], factions: [], missions: [] };
+// mapNodes: { "col,row": { name, faction, hazard, port, notes } }
+// mapEdges: [ ["col,row","col,row"], ... ]
+let mapNodes = {};
+let mapEdges = [];
+
+let currentTab = 'ships';
+let currentSheet = null;
+let editIndex = null;
+let expanded = {};
+
+// MAP STATE
+const MAP_COLS = 20;
+const MAP_ROWS = 10;
+const CELL_W = 56;
+const CELL_H = 52;
+let mapMode = 'place'; // place | connect | delete
+let connectSource = null;
+let editingNodeKey = null;
+
+// ════════════════════════════════════════
+// PERSISTENCE
+// ════════════════════════════════════════
+function loadData() {
+  ['ships','trade','factions','missions'].forEach(k => {
+    try { const d = localStorage.getItem('stf2_'+k); if(d) storage[k]=JSON.parse(d); } catch(e){}
+  });
+  try { const d = localStorage.getItem('stf2_mapNodes'); if(d) mapNodes=JSON.parse(d); } catch(e){}
+  try { const d = localStorage.getItem('stf2_mapEdges'); if(d) mapEdges=JSON.parse(d); } catch(e){}
+}
+
+function saveData() {
+  ['ships','trade','factions','missions'].forEach(k => {
+    try { localStorage.setItem('stf2_'+k, JSON.stringify(storage[k])); } catch(e){}
+  });
+}
+
+function saveMapData() {
+  try { localStorage.setItem('stf2_mapNodes', JSON.stringify(mapNodes)); } catch(e){}
+  try { localStorage.setItem('stf2_mapEdges', JSON.stringify(mapEdges)); } catch(e){}
+}
+
+// ════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    currentTab = tab;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (tab === 'map') {
+      document.getElementById('scroll-area').style.display = 'none';
+      document.getElementById('section-map').classList.add('active');
+      document.getElementById('section-map').style.display = 'flex';
+      document.getElementById('fab-btn').classList.add('hidden');
+    } else {
+      document.getElementById('scroll-area').style.display = '';
+      document.getElementById('section-map').classList.remove('active');
+      document.getElementById('section-map').style.display = 'none';
+      document.getElementById('fab-btn').classList.remove('hidden');
+      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+      document.getElementById('section-'+tab).classList.add('active');
+      document.getElementById('scroll-area').scrollTop = 0;
+    }
+    expanded = {};
+    connectSource = null;
+  });
+});
+
+function toggleCard(id) {
+  expanded[id] = !expanded[id];
+  const det = document.getElementById('detail-'+id);
+  const chev = document.getElementById('chev-'+id);
+  if(det) det.classList.toggle('open', !!expanded[id]);
+  if(chev) chev.classList.toggle('open', !!expanded[id]);
+}
+
+// ════════════════════════════════════════
+// MAP INIT
+// ════════════════════════════════════════
+const FACTION_COLORS = {
+  none:'#2a4a8a', templar:'#a855f7', isc:'#3a8fff', pirates:'#ff4757',
+  frontier:'#ff6b35', cadar:'#ffd166', rychart:'#00ff9d', custom1:'#e879f9', custom2:'#38bdf8'
+};
+const FACTION_LABELS = {
+  none:'Unknown', templar:'Templars', isc:'ISC', pirates:'Pirates',
+  frontier:'Frontier', cadar:'Cadar', rychart:'Rychart', custom1:'Custom 1', custom2:'Custom 2'
+};
+const HAZARD_COLORS = ['#00ff9d','#ffd166','#ff6b35','#ff4757'];
+
+function buildGrid() {
+  const grid = document.getElementById('map-grid');
+  const svg = document.getElementById('map-svg');
+  const totalW = MAP_COLS * CELL_W;
+  const totalH = MAP_ROWS * CELL_H;
+
+  grid.style.gridTemplateColumns = `repeat(${MAP_COLS}, ${CELL_W}px)`;
+  grid.style.width = totalW + 'px';
+  grid.style.height = totalH + 'px';
+  svg.setAttribute('width', totalW);
+  svg.setAttribute('height', totalH);
+  svg.style.width = totalW + 'px';
+  svg.style.height = totalH + 'px';
+
+  grid.innerHTML = '';
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'map-cell';
+      cell.dataset.col = c;
+      cell.dataset.row = r;
+      cell.id = `cell-${c}-${r}`;
+      cell.addEventListener('click', () => handleCellClick(c, r));
+      grid.appendChild(cell);
+    }
+  }
+  renderMap();
+  buildLegend();
+}
+
+function cellCenter(c, r) {
+  return { x: c * CELL_W + CELL_W/2, y: r * CELL_H + CELL_H/2 };
+}
+
+function renderMap() {
+  // render nodes into cells
+  for (let r = 0; r < MAP_ROWS; r++) {
+    for (let c = 0; c < MAP_COLS; c++) {
+      const cell = document.getElementById(`cell-${c}-${r}`);
+      if (!cell) continue;
+      const key = `${c},${r}`;
+      const node = mapNodes[key];
+      // remove old node el
+      const old = cell.querySelector('.map-node');
+      if (old) old.remove();
+      cell.classList.toggle('has-node', !!node);
+
+      if (node) {
+        const el = document.createElement('div');
+        el.className = `map-node node-f-${node.faction||'none'}`;
+        if (key === connectSource) el.classList.add('connect-source');
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'node-name';
+        nameEl.textContent = node.name || '?';
+        el.appendChild(nameEl);
+
+        if (node.port && node.port !== 'none') {
+          const dot = document.createElement('div');
+          dot.className = 'node-port-dot';
+          el.appendChild(dot);
+        }
+
+        if (node.hazard && node.hazard !== '0') {
+          const pip = document.createElement('div');
+          pip.className = `node-hazard-pip hz-${node.hazard}`;
+          el.appendChild(pip);
+        }
+
+        cell.appendChild(el);
+      }
+    }
+  }
+  renderEdges();
+}
+
+function renderEdges() {
+  const svg = document.getElementById('map-svg');
+  svg.innerHTML = '';
+  mapEdges.forEach(([a, b]) => {
+    const [ac, ar] = a.split(',').map(Number);
+    const [bc, br] = b.split(',').map(Number);
+    const p1 = cellCenter(ac, ar);
+    const p2 = cellCenter(bc, br);
+
+    // color based on shared faction or default
+    const na = mapNodes[a], nb = mapNodes[b];
+    let color = '#2a4a8a';
+    if (na && nb && na.faction === nb.faction && na.faction !== 'none') {
+      color = FACTION_COLORS[na.faction] || '#2a4a8a';
+    }
+
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+    line.setAttribute('stroke', color);
+    line.setAttribute('stroke-width', '2');
+    line.setAttribute('opacity', '0.6');
+    svg.appendChild(line);
+  });
+}
+
+function buildLegend() {
+  const leg = document.getElementById('map-legend');
+  const usedFactions = new Set(Object.values(mapNodes).map(n => n.faction||'none'));
+  let html = '';
+  usedFactions.forEach(f => {
+    html += `<div class="legend-item"><div class="legend-swatch" style="background:${FACTION_COLORS[f]||'#2a4a8a'}"></div>${FACTION_LABELS[f]||f}</div>`;
+  });
+  // hazard key
+  html += `<div class="legend-item"><div class="legend-swatch" style="background:var(--green)"></div>Safe</div>`;
+  html += `<div class="legend-item"><div class="legend-swatch" style="background:var(--yellow)"></div>Low</div>`;
+  html += `<div class="legend-item"><div class="legend-swatch" style="background:var(--accent3)"></div>Med</div>`;
+  html += `<div class="legend-item"><div class="legend-swatch" style="background:var(--red)"></div>Danger</div>`;
+  html += `<div class="legend-item"><div class="legend-swatch" style="background:var(--accent2);border-radius:50%"></div>Port</div>`;
+  leg.innerHTML = html;
+}
+
+// ════════════════════════════════════════
+// MAP INTERACTIONS
+// ════════════════════════════════════════
+function setMapMode(mode) {
+  mapMode = mode;
+  connectSource = null;
+  document.querySelectorAll('.map-mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('mode-'+mode).classList.add('active');
+  const hints = {
+    place: 'Tap empty cell to add · Tap node to edit',
+    connect: 'Tap first system → tap second to connect (cardinal only)',
+    delete: 'Tap a node or connection to remove'
+  };
+  document.getElementById('map-hint').textContent = hints[mode];
+  renderMap();
+}
+
+function handleCellClick(c, r) {
+  const key = `${c},${r}`;
+  const hasNode = !!mapNodes[key];
+
+  if (mapMode === 'place') {
+    openNodeSheet(key, hasNode ? mapNodes[key] : null);
+  } else if (mapMode === 'connect') {
+    if (!hasNode) return;
+    if (!connectSource) {
+      connectSource = key;
+      document.getElementById('map-hint').textContent = `Source: ${mapNodes[key].name} · Now tap target`;
+      renderMap();
+    } else {
+      if (connectSource === key) { connectSource = null; renderMap(); return; }
+      // validate cardinal adjacency
+      const [sc, sr] = connectSource.split(',').map(Number);
+      const dc = Math.abs(c - sc), dr = Math.abs(r - sr);
+      if (!((dc===1&&dr===0)||(dc===0&&dr===1))) {
+        document.getElementById('map-hint').textContent = 'Systems must be adjacent (no diagonals)';
+        connectSource = null; renderMap();
+        setTimeout(() => document.getElementById('map-hint').textContent='Tap first system → tap second to connect (cardinal only)', 2000);
+        return;
+      }
+      // check duplicate
+      const exists = mapEdges.some(([a,b]) => (a===connectSource&&b===key)||(a===key&&b===connectSource));
+      if (!exists) {
+        mapEdges.push([connectSource, key]);
+        saveMapData();
+      }
+      connectSource = null;
+      document.getElementById('map-hint').textContent = 'Connection added · Tap next source';
+      renderMap();
+    }
+  } else if (mapMode === 'delete') {
+    if (hasNode) {
+      if (!confirm(`Delete system "${mapNodes[key].name}"?\nConnections to it will also be removed.`)) return;
+      delete mapNodes[key];
+      mapEdges = mapEdges.filter(([a,b]) => a!==key && b!==key);
+      saveMapData(); renderMap(); buildLegend();
+    } else {
+      // find and remove nearest edge
+      removeNearestEdge(c, r);
+    }
+  }
+}
+
+function removeNearestEdge(c, r) {
+  // find edge whose midpoint is closest to tapped cell center
+  const tap = cellCenter(c, r);
+  let best = null, bestDist = Infinity;
+  mapEdges.forEach((e, i) => {
+    const [ac, ar] = e[0].split(',').map(Number);
+    const [bc, br] = e[1].split(',').map(Number);
+    const mx = (ac + bc) / 2 * CELL_W + CELL_W/2;
+    const my = (ar + br) / 2 * CELL_H + CELL_H/2;
+    const dist = Math.hypot(tap.x - mx, tap.y - my);
+    if (dist < bestDist) { bestDist = dist; best = i; }
+  });
+  if (best !== null && bestDist < CELL_W * 1.2) {
+    mapEdges.splice(best, 1);
+    saveMapData(); renderMap();
+  }
+}
+
+// ════════════════════════════════════════
+// NODE SHEET
+// ════════════════════════════════════════
+function openNodeSheet(key, existing) {
+  editingNodeKey = key;
+  const [c, r] = key.split(',');
+  document.getElementById('node-sheet-title').textContent = existing ? `// Edit System [${c},${r}]` : `// New System [${c},${r}]`;
+  document.getElementById('ns-name').value = existing?.name || '';
+  document.getElementById('ns-faction').value = existing?.faction || 'none';
+  document.getElementById('ns-hazard').value = existing?.hazard || '0';
+  document.getElementById('ns-port').value = existing?.port || 'none';
+  document.getElementById('ns-notes').value = existing?.notes || '';
+
+  const delBtn = document.getElementById('node-delete-btn');
+  if (existing) {
+    delBtn.style.display = '';
+    delBtn.onclick = () => {
+      if (!confirm(`Delete "${existing.name}"?`)) return;
+      delete mapNodes[editingNodeKey];
+      mapEdges = mapEdges.filter(([a,b]) => a!==editingNodeKey && b!==editingNodeKey);
+      saveMapData(); closeNodeSheet(); renderMap(); buildLegend();
+    };
+  } else {
+    delBtn.style.display = 'none';
+  }
+
+  document.getElementById('node-sheet-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('ns-name').focus(), 300);
+}
+
+function saveNode() {
+  const name = document.getElementById('ns-name').value.trim();
+  if (!name) { alert('Please enter a system name.'); return; }
+  mapNodes[editingNodeKey] = {
+    name,
+    faction: document.getElementById('ns-faction').value,
+    hazard: document.getElementById('ns-hazard').value,
+    port: document.getElementById('ns-port').value,
+    notes: document.getElementById('ns-notes').value.trim()
+  };
+  saveMapData(); closeNodeSheet(); renderMap(); buildLegend();
+  const el = document.getElementById('nc-map');
+  if(el){el.textContent=Object.keys(mapNodes).length;el.classList.toggle('visible',Object.keys(mapNodes).length>0);}
+}
+
+function closeNodeSheet() {
+  document.getElementById('node-sheet-overlay').classList.remove('open');
+  editingNodeKey = null;
+}
+
+document.getElementById('node-sheet-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('node-sheet-overlay')) closeNodeSheet();
+});
+
+// ════════════════════════════════════════
+// ENTRY SHEETS (ships/trade/factions/missions)
+// ════════════════════════════════════════
+document.getElementById('fab-btn').addEventListener('click', () => openSheet(currentTab));
+document.getElementById('sheet-close-btn').addEventListener('click', closeSheet);
+document.getElementById('sheet-cancel-btn').addEventListener('click', closeSheet);
+document.getElementById('sheet-save-btn').addEventListener('click', saveEntry);
+document.getElementById('sheet-overlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('sheet-overlay')) closeSheet();
+});
+
+const forms = {
+  ships: () => `
+    <div class="form-group"><label class="form-label">Ship Name *</label><input class="form-input" id="f-name" placeholder="e.g. Iron Vanguard" autocomplete="off"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Class / Type</label><input class="form-input" id="f-class" placeholder="Freighter"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="f-status"><option value="active">Active</option><option value="docked">Docked</option><option value="damaged">Damaged</option><option value="lost">Lost</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Hull Points</label><input class="form-input" id="f-hull" placeholder="450/500"></div>
+      <div class="form-group"><label class="form-label">Armor</label><input class="form-input" id="f-armor" placeholder="80"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Crew Slots</label><input class="form-input" id="f-crew-slots" placeholder="12/15"></div>
+      <div class="form-group"><label class="form-label">Cargo Cap.</label><input class="form-input" id="f-cargo" placeholder="200 units"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Weapons / Loadout</label><input class="form-input" id="f-weapons" placeholder="4× Pulse Cannon, 2× Torpedo Bay"></div>
+    <div class="form-group"><label class="form-label">Captain</label><input class="form-input" id="f-captain" placeholder="Name & rank"></div>
+    <div class="form-group"><label class="form-label">Key Crew (comma-separated)</label><input class="form-input" id="f-crew" placeholder="Navigator Sela, Engineer Rook"></div>
+    <div class="form-group"><label class="form-label">Location / Sector</label><input class="form-input" id="f-location" placeholder="Forge Station, Kepler Arm"></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Upgrades, quirks, mission history..."></textarea></div>
+  `,
+  trade: () => `
+    <div class="form-group"><label class="form-label">Route Name *</label><input class="form-input" id="f-name" placeholder="e.g. Kepler–Forge Run" autocomplete="off"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Origin Port</label><input class="form-input" id="f-origin" placeholder="Station / Planet"></div>
+      <div class="form-group"><label class="form-label">Destination</label><input class="form-input" id="f-dest" placeholder="Station / Planet"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Profitability</label>
+        <select class="form-select" id="f-profit"><option value="excellent">Excellent</option><option value="good">Good</option><option value="average">Average</option><option value="poor">Poor</option><option value="risky">Risky</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Travel Time</label><input class="form-input" id="f-travel-time" placeholder="3 turns"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Buy at Origin</label><input class="form-input" id="f-buy" placeholder="Ore, Food, Fuel Cells"></div>
+    <div class="form-group"><label class="form-label">Sell at Destination</label><input class="form-input" id="f-sell" placeholder="Processed Metal, Weapons"></div>
+    <div class="form-group"><label class="form-label">Avg Profit / Run</label><input class="form-input" id="f-avg-profit" placeholder="5,000 CR"></div>
+    <div class="form-group"><label class="form-label">Hazards / Faction Control</label><input class="form-input" id="f-hazards" placeholder="Pirates near Node 7"></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Market tips, patrol patterns..."></textarea></div>
+  `,
+  factions: () => `
+    <div class="form-group"><label class="form-label">Faction Name *</label><input class="form-input" id="f-name" placeholder="e.g. Templar Knights" autocomplete="off"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Type</label>
+        <select class="form-select" id="f-type"><option value="major">Major</option><option value="minor">Minor</option><option value="pirate">Pirate</option><option value="merchant">Merchant</option><option value="military">Military</option><option value="government">Government</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Standing / Rank</label><input class="form-input" id="f-standing" placeholder="Trusted, Enemy..."></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Reputation</label>
+      <span class="range-display" id="rep-display">0</span>
+      <input type="range" id="f-rep" min="-100" max="100" value="0" oninput="document.getElementById('rep-display').textContent=this.value">
+    </div>
+    <div class="form-group"><label class="form-label">Key Contacts</label><input class="form-input" id="f-contacts" placeholder="Commander Aldric (Port Kessel)"></div>
+    <div class="form-group"><label class="form-label">Territory / Influence Zone</label><input class="form-input" id="f-territory" placeholder="Outer Kepler Arm, 3 systems"></div>
+    <div class="form-group"><label class="form-label">Benefits / Perks</label><input class="form-input" id="f-benefits" placeholder="Discounts, escort missions..."></div>
+    <div class="form-group"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="History, conflicts, obligations..."></textarea></div>
+  `,
+  missions: () => `
+    <div class="form-group"><label class="form-label">Mission Title *</label><input class="form-input" id="f-name" placeholder="e.g. Intercept the Courier" autocomplete="off"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Status</label>
+        <select class="form-select" id="f-status"><option value="active">Active</option><option value="on-hold">On Hold</option><option value="complete">Complete</option><option value="failed">Failed</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Type</label>
+        <select class="form-select" id="f-type"><option value="combat">Combat</option><option value="trade">Trade/Smuggle</option><option value="escort">Escort</option><option value="recon">Recon</option><option value="bounty">Bounty</option><option value="story">Story</option><option value="other">Other</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Given By</label><input class="form-input" id="f-giver" placeholder="Faction / NPC"></div>
+      <div class="form-group"><label class="form-label">Deadline</label><input class="form-input" id="f-deadline" placeholder="8 turns"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Reward</label><input class="form-input" id="f-reward" placeholder="12,000 CR + rep"></div>
+    <div class="form-group"><label class="form-label">Objective</label><textarea class="form-textarea" id="f-objective" placeholder="What needs to be done..."></textarea></div>
+    <div class="form-group"><label class="form-label">Location / Target</label><input class="form-input" id="f-location" placeholder="Sector 7, Node Kappa"></div>
+    <div class="form-group"><label class="form-label">Notes / Intel</label><textarea class="form-textarea" id="f-notes" placeholder="Tips, complications..."></textarea></div>
+  `
+};
+
+function openSheet(type, idx=null) {
+  currentSheet = type;
+  editIndex = idx;
+  const titles = { ships:'Ship Registry', trade:'Trade Route', factions:'Faction Intel', missions:'Mission Dossier' };
+  document.getElementById('sheet-title').textContent = (idx!==null?'// Edit ':'// New ') + titles[type];
+  document.getElementById('sheet-form').innerHTML = forms[type]();
+  if (idx !== null) populateForm(type, storage[type][idx]);
+  document.getElementById('sheet-overlay').classList.add('open');
+  setTimeout(() => { const el=document.getElementById('f-name'); if(el) el.focus(); }, 320);
+}
+
+function populateForm(type, item) {
+  const sv = (id, val) => { const el=document.getElementById(id); if(el&&val!==undefined) el.value=val; };
+  if (type==='ships') { sv('f-name',item.name);sv('f-class',item.shipClass);sv('f-hull',item.hull);sv('f-armor',item.armor);sv('f-crew-slots',item.crewSlots);sv('f-cargo',item.cargo);sv('f-weapons',item.weapons);sv('f-captain',item.captain);sv('f-crew',item.crew);sv('f-location',item.location);sv('f-status',item.status);sv('f-notes',item.notes); }
+  else if (type==='trade') { sv('f-name',item.name);sv('f-profit',item.profit);sv('f-origin',item.origin);sv('f-dest',item.dest);sv('f-buy',item.buy);sv('f-sell',item.sell);sv('f-avg-profit',item.avgProfit);sv('f-travel-time',item.travelTime);sv('f-hazards',item.hazards);sv('f-notes',item.notes); }
+  else if (type==='factions') { sv('f-name',item.name);sv('f-type',item.factionType);sv('f-rep',item.rep||0);const rd=document.getElementById('rep-display');if(rd)rd.textContent=item.rep||0;sv('f-standing',item.standing);sv('f-contacts',item.contacts);sv('f-territory',item.territory);sv('f-benefits',item.benefits);sv('f-notes',item.notes); }
+  else if (type==='missions') { sv('f-name',item.name);sv('f-status',item.status);sv('f-type',item.missionType);sv('f-giver',item.giver);sv('f-reward',item.reward);sv('f-deadline',item.deadline);sv('f-objective',item.objective);sv('f-location',item.location);sv('f-notes',item.notes); }
+}
+
+function gv(id) { const el=document.getElementById(id); return el?el.value.trim():''; }
+
+function saveEntry() {
+  const type = currentSheet;
+  let item = {};
+  if (type==='ships') item={name:gv('f-name'),shipClass:gv('f-class'),hull:gv('f-hull'),armor:gv('f-armor'),crewSlots:gv('f-crew-slots'),cargo:gv('f-cargo'),weapons:gv('f-weapons'),captain:gv('f-captain'),crew:gv('f-crew'),location:gv('f-location'),status:gv('f-status'),notes:gv('f-notes')};
+  else if (type==='trade') item={name:gv('f-name'),profit:gv('f-profit'),origin:gv('f-origin'),dest:gv('f-dest'),buy:gv('f-buy'),sell:gv('f-sell'),avgProfit:gv('f-avg-profit'),travelTime:gv('f-travel-time'),hazards:gv('f-hazards'),notes:gv('f-notes')};
+  else if (type==='factions') item={name:gv('f-name'),factionType:gv('f-type'),rep:parseInt(gv('f-rep'))||0,standing:gv('f-standing'),contacts:gv('f-contacts'),territory:gv('f-territory'),benefits:gv('f-benefits'),notes:gv('f-notes')};
+  else if (type==='missions') item={name:gv('f-name'),status:gv('f-status'),missionType:gv('f-type'),giver:gv('f-giver'),reward:gv('f-reward'),deadline:gv('f-deadline'),objective:gv('f-objective'),location:gv('f-location'),notes:gv('f-notes')};
+  if (!item.name) { alert('Please enter a name.'); return; }
+  if (editIndex!==null) storage[type][editIndex]=item;
+  else storage[type].push(item);
+  saveData(); closeSheet(); renderAll();
+}
+
+function deleteEntry(type, idx) {
+  if (!confirm('Delete this entry?')) return;
+  storage[type].splice(idx,1);
+  saveData(); renderAll();
+}
+
+function closeSheet() {
+  document.getElementById('sheet-overlay').classList.remove('open');
+  currentSheet=null; editIndex=null;
+}
+
+// ════════════════════════════════════════
+// RENDER (cards)
+// ════════════════════════════════════════
+const BM = {
+  profit:{excellent:'badge-green',good:'badge-blue',average:'badge-yellow',poor:'badge-orange',risky:'badge-red'},
+  status:{active:'badge-green',docked:'badge-blue',damaged:'badge-orange',lost:'badge-red',complete:'badge-green',failed:'badge-red','on-hold':'badge-yellow'},
+  mission:{combat:'badge-red',trade:'badge-blue',escort:'badge-yellow',recon:'badge-purple',bounty:'badge-orange',story:'badge-green',other:'badge-blue'},
+  faction:{major:'badge-blue',minor:'badge-yellow',pirate:'badge-red',merchant:'badge-green',military:'badge-orange',government:'badge-purple'}
+};
+const b = (cls, lbl) => `<span class="badge ${cls}">${lbl}</span>`;
+const repColor = r => r>=60?'#00ff9d':r>=20?'#3a8fff':r>=-20?'#ffd166':r>=-60?'#ff6b35':'#ff4757';
+const drow = (lbl, val) => val?`<div class="detail-row"><span class="detail-label">${lbl}</span><span class="detail-val">${val}</span></div>`:'';
+
+function renderShips() {
+  const list = document.getElementById('ships-list');
+  if (!storage.ships.length) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">🚀</div><div class="empty-text">No ships registered</div></div>`; return; }
+  list.innerHTML = storage.ships.map((s,i) => {
+    const id='ship-'+i;
+    const crewTags = s.crew?s.crew.split(',').map(c=>b('badge-blue',c.trim())).join(''):'';
+    return `<div class="card" style="border-left-color:var(--accent)">
+      <div class="card-tap" onclick="toggleCard('${id}')">
+        <div class="card-top"><div><div class="card-title">${s.name}</div><div class="card-sub">${s.shipClass||'—'} · ${s.location||'unknown'}</div></div>
+        <div class="card-badges">${b(BM.status[s.status||'active']||'badge-blue',s.status||'active')}<span class="card-chevron" id="chev-${id}">▼</span></div></div>
+        <div class="card-preview">${s.hull?`<span class="preview-item"><strong>Hull</strong> ${s.hull}</span>`:''} ${s.crewSlots?`<span class="preview-item"><strong>Crew</strong> ${s.crewSlots}</span>`:''} ${s.cargo?`<span class="preview-item"><strong>Cargo</strong> ${s.cargo}</span>`:''}</div>
+      </div>
+      <div class="card-detail" id="detail-${id}">${drow('Armor',s.armor)}${drow('Weapons',s.weapons)}${drow('Captain',s.captain)}${crewTags?`<div class="detail-row"><span class="detail-label">Crew</span><span class="detail-val"><div class="crew-tags">${crewTags}</div></span></div>`:''}${s.notes?`<div class="note-box">${s.notes}</div>`:''}</div>
+      <div class="card-actions-bar"><button class="card-action-btn edit" onclick="openSheet('ships',${i})">✏ Edit</button><button class="card-action-btn del" onclick="deleteEntry('ships',${i})">✕ Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+function renderTrade() {
+  const list = document.getElementById('trade-list');
+  if (!storage.trade.length) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-text">No trade routes logged</div></div>`; return; }
+  list.innerHTML = storage.trade.map((t,i) => {
+    const id='trade-'+i;
+    return `<div class="card" style="border-left-color:var(--green)">
+      <div class="card-tap" onclick="toggleCard('${id}')">
+        <div class="card-top"><div><div class="card-title">${t.name}</div><div class="card-sub">${t.origin||'—'} → ${t.dest||'—'}</div></div>
+        <div class="card-badges">${b(BM.profit[t.profit||'average']||'badge-blue',t.profit||'avg')}<span class="card-chevron" id="chev-${id}">▼</span></div></div>
+        <div class="card-preview">${t.avgProfit?`<span class="preview-item"><strong>Profit</strong> ${t.avgProfit}</span>`:''} ${t.travelTime?`<span class="preview-item"><strong>Time</strong> ${t.travelTime}</span>`:''}</div>
+      </div>
+      <div class="card-detail" id="detail-${id}">${drow('Buy',t.buy)}${drow('Sell',t.sell)}${drow('Hazards',t.hazards)}${t.notes?`<div class="note-box">${t.notes}</div>`:''}</div>
+      <div class="card-actions-bar"><button class="card-action-btn edit" onclick="openSheet('trade',${i})">✏ Edit</button><button class="card-action-btn del" onclick="deleteEntry('trade',${i})">✕ Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+function renderFactions() {
+  const list = document.getElementById('factions-list');
+  if (!storage.factions.length) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">⚔️</div><div class="empty-text">No factions tracked</div></div>`; return; }
+  list.innerHTML = storage.factions.map((f,i) => {
+    const id='faction-'+i; const rep=f.rep||0, pct=((rep+100)/200*100).toFixed(1), color=repColor(rep);
+    return `<div class="card" style="border-left-color:var(--purple)">
+      <div class="card-tap" onclick="toggleCard('${id}')">
+        <div class="card-top"><div><div class="card-title">${f.name}</div><div class="card-sub">${f.standing||'—'}</div></div>
+        <div class="card-badges">${b(BM.faction[f.factionType||'minor']||'badge-blue',f.factionType||'minor')}<span class="card-chevron" id="chev-${id}">▼</span></div></div>
+        <div class="card-preview" style="width:100%"><div style="width:100%"><div class="rep-bar-wrap"><div class="rep-bar-bg"><div class="rep-bar-fill" style="width:${pct}%;background:${color}"></div></div><span class="rep-val" style="color:${color}">${rep>0?'+':''}${rep}</span></div></div></div>
+      </div>
+      <div class="card-detail" id="detail-${id}">${drow('Contacts',f.contacts)}${drow('Territory',f.territory)}${drow('Benefits',f.benefits)}${f.notes?`<div class="note-box">${f.notes}</div>`:''}</div>
+      <div class="card-actions-bar"><button class="card-action-btn edit" onclick="openSheet('factions',${i})">✏ Edit</button><button class="card-action-btn del" onclick="deleteEntry('factions',${i})">✕ Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+function renderMissions() {
+  const list = document.getElementById('missions-list');
+  if (!storage.missions.length) { list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No missions logged</div></div>`; return; }
+  const order={active:0,'on-hold':1,complete:2,failed:3};
+  const sorted=[...storage.missions.map((m,i)=>({...m,_i:i}))].sort((a,c)=>(order[a.status]||0)-(order[c.status]||0));
+  const bc={active:'var(--yellow)',complete:'var(--green)',failed:'var(--red)','on-hold':'var(--border-bright)'};
+  list.innerHTML = sorted.map(m => {
+    const id='mission-'+m._i;
+    return `<div class="card" style="border-left-color:${bc[m.status]||'var(--border-bright)'}">
+      <div class="card-tap" onclick="toggleCard('${id}')">
+        <div class="card-top"><div><div class="card-title">${m.name}</div><div class="card-sub">${m.giver||'—'}</div></div>
+        <div class="card-badges">${b(BM.status[m.status||'active']||'badge-blue',m.status||'active')} ${b(BM.mission[m.missionType||'other']||'badge-blue',m.missionType||'other')}<span class="card-chevron" id="chev-${id}">▼</span></div></div>
+        <div class="card-preview">${m.reward?`<span class="preview-item"><strong>Reward</strong> ${m.reward}</span>`:''} ${m.deadline?`<span class="preview-item" style="color:var(--yellow)"><strong>⏱</strong> ${m.deadline}</span>`:''}</div>
+      </div>
+      <div class="card-detail" id="detail-${id}">${m.objective?`<div class="detail-row"><span class="detail-label">Objective</span><span class="detail-val">${m.objective}</span></div>`:''}${drow('Location',m.location)}${m.notes?`<div class="note-box">${m.notes}</div>`:''}</div>
+      <div class="card-actions-bar"><button class="card-action-btn edit" onclick="openSheet('missions',${m._i})">✏ Edit</button><button class="card-action-btn del" onclick="deleteEntry('missions',${m._i})">✕ Delete</button></div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats() {
+  ['ships','trade','factions','missions'].forEach(k => {
+    const el=document.getElementById('nc-'+k);
+    if(el){el.textContent=storage[k].length;el.classList.toggle('visible',storage[k].length>0);}
+  });
+  const active=storage.missions.filter(m=>m.status==='active').length;
+  const pill=document.getElementById('active-pill');
+  if(pill) pill.innerHTML=active>0?`<strong>${active}</strong> active`:'';
+  const mc=Object.keys(mapNodes).length;
+  const mel=document.getElementById('nc-map');
+  if(mel){mel.textContent=mc;mel.classList.toggle('visible',mc>0);}
+}
+
+function renderAll() {
+  renderShips(); renderTrade(); renderFactions(); renderMissions(); updateStats();
+}
+
+// ════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════
+loadData();
+renderAll();
+buildGrid();
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
