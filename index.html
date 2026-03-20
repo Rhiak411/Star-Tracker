@@ -265,11 +265,12 @@ header {
 .map-grid { position: absolute; top: 0; left: 0; z-index: 2; }
 .mcell { position: absolute; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .mcell-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--steel); opacity: 0.5; }
-.mnode { position: absolute; border-radius: 2px; border: 1px solid var(--border-bright); background: var(--panel); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s; z-index: 3; }
+.mnode { position: absolute; border-radius: 2px; border: 1px solid var(--border-bright); background: var(--panel); display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0; overflow: hidden; cursor: pointer; transition: box-shadow 0.15s; z-index: 3; }
 .mnode:active { opacity: 0.8; }
 .mnode.sel { box-shadow: 0 0 0 2px var(--teal2), 0 0 10px rgba(0,232,248,0.4); }
 .mnode.conn-src { box-shadow: 0 0 0 2px var(--yellow), 0 0 10px rgba(240,192,64,0.4); }
-.mnode-name { font-family: var(--mono); font-size: 0.38rem; color: var(--text-bright); text-align: center; line-height: 1.2; padding: 0 2px; max-width: 100%; overflow: hidden; word-break: break-word; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.mnode-name { font-family: var(--mono); font-size: 0.52rem; color: var(--text-bright); text-align: center; line-height: 1.35; padding: 3px 4px 3px 7px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+.mnode-bar { flex-shrink: 0; display: flex; justify-content: space-between; padding: 1px 4px 2px 7px; font-family: var(--mono); font-size: 0.42rem; color: var(--text-dim); border-top: 1px solid rgba(42,61,85,0.8); background: rgba(14,17,23,0.6); line-height: 1.5; }
 .mnode-port { width: 4px; height: 4px; border-radius: 50%; background: var(--teal2); flex-shrink: 0; }
 .mnode-hz { position: absolute; bottom: 1px; right: 2px; width: 4px; height: 4px; border-radius: 50%; }
 
@@ -289,7 +290,7 @@ header {
 .leg-sw { width: 9px; height: 9px; border-radius: 1px; flex-shrink: 0; }
 
 /* travel time label on svg */
-.tt-label { font-family: var(--mono); font-size: 9px; fill: var(--text-dim); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.tt-label { font-family: var(--mono); font-size: 9px; fill: var(--teal2); text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 
 /* ══════════════════════════════
    MISSIONS TAB
@@ -625,12 +626,12 @@ header {
 // ══════════════════════════════════════════
 const COLS = 30;       // number of placeable system columns
 const ROWS = 30;       // number of placeable system rows
-const SPACING = 64;    // px between system centers
-const SYS_W = 52;      // node width px
-const SYS_H = 42;      // node height px
-const MARGIN = 10;     // px margin around the grid
-const TOTAL_W = MARGIN * 2 + COLS * SPACING;
-const TOTAL_H = MARGIN * 2 + ROWS * SPACING;
+const SPACING = 124;   // px between system centers
+const SYS_W = 80;      // node width px
+const SYS_H = 64;      // node height px — tall enough for 3 lines + info bar
+const MARGIN = 50;     // px margin — keeps edge nodes fully visible
+const TOTAL_W = MARGIN * 2 + (COLS - 1) * SPACING;
+const TOTAL_H = MARGIN * 2 + (ROWS - 1) * SPACING;
 
 const FACTIONS = [
   { id:'javat',      name:'Clan Javat',          color:'#28a050', color2:'#00c8d4', group:'house' },
@@ -944,10 +945,23 @@ function badge(cls, txt) { return `<span class="badge ${cls}">${txt}</span>`; }
 function drow(lbl, val) { if (!val) return ''; return `<div class="drow"><span class="dlbl">${lbl}</span><span class="dval">${val}</span></div>`; }
 
 function sysOptions(selected='') {
-  return '<option value="">— None —</option>' + systems.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.name}</option>`).join('');
+  const sorted = [...systems].sort((a,b) => a.name.localeCompare(b.name));
+  return '<option value="">— None —</option>' + sorted.map(s => `<option value="${s.id}" ${s.id===selected?'selected':''}>${s.name}</option>`).join('');
 }
-function facOptions(selected='') {
-  return FACTIONS.map(f => `<option value="${f.id}" ${f.id===selected?'selected':''}>${f.name}</option>`).join('');
+// Canonical faction order: A-Z by meaningful word, Templar/Hunna/Independents pinned bottom
+const PINNED_FACS = ['templar','hunna','independent'];
+const sortKey = name => name.replace(/^(Clan|House|Syndicate)\s+/i, '');
+const FACTIONS_SORTED = [
+  ...FACTIONS.filter(f => !PINNED_FACS.includes(f.id) && f.id !== 'unknown')
+             .sort((a,b) => sortKey(a.name).localeCompare(sortKey(b.name))),
+  ...PINNED_FACS.map(id => FACTIONS.find(f => f.id === id))
+];
+
+function facOptions(selected='', primaryOnly=false) {
+  const list = primaryOnly
+    ? FACTIONS_SORTED.filter(f => !PINNED_FACS.includes(f.id))
+    : FACTIONS_SORTED;
+  return list.map(f => `<option value="${f.id}" ${f.id===selected?'selected':''}>${f.name}</option>`).join('');
 }
 function conOptions(selected='') {
   return '<option value="">— None —</option>' + contacts.map(c => `<option value="${c.id}" ${c.id===selected?'selected':''}>${c.name}</option>`).join('');
@@ -971,13 +985,13 @@ function openSysSheet(id=null) {
   document.getElementById('s-worlds').value = sys?.worlds || '';
   document.getElementById('s-notes').value = sys?.notes || '';
 
-  // primary faction
+  // primary faction — excludes Templar, Hunna, Independents
   const pf = document.getElementById('s-pfac');
-  pf.innerHTML = facOptions(sys?.pfac || 'unknown');
+  pf.innerHTML = facOptions(sys?.pfac || 'unknown', true);
 
-  // secondary faction checkboxes
+  // secondary faction checkboxes — sorted same as factions tab
   const sfc = document.getElementById('s-sfac-checks');
-  sfc.innerHTML = FACTIONS.map(f => `
+  sfc.innerHTML = FACTIONS_SORTED.map(f => `
     <label class="check-item ${(sys?.sfacs||[]).includes(f.id)?'checked':''}">
       <input type="checkbox" value="${f.id}" ${(sys?.sfacs||[]).includes(f.id)?'checked':''} onchange="this.closest('.check-item').classList.toggle('checked',this.checked)">
       <span>${f.name}</span>
@@ -1095,20 +1109,13 @@ function getFacData(id) { return factions.find(f=>f.id===id) || { stance:'neutra
 
 function renderFactions() {
   const list = document.getElementById('fac-list');
-  const pinned = ['templar','hunna','independent'];
-  const sortKey = name => name.replace(/^(Clan|House|Syndicate)\s+/i, '');
-  const main = FACTIONS
-    .filter(f => !pinned.includes(f.id) && f.id !== 'unknown')
-    .sort((a,b) => sortKey(a.name).localeCompare(sortKey(b.name)));
-  const bottom = pinned.map(id => FACTIONS.find(f=>f.id===id));
-  const ordered = [...main, ...bottom];
 
-  list.innerHTML = ordered.map(f => {
+  list.innerHTML = FACTIONS_SORTED.map(f => {
     const info = factionById(f.id);
     const fd = getFacData(f.id);
     const sc = STANCE_BADGE[fd.stance||'neutral'] || 'b-steel';
     const border = factionBorder(f.id);
-    return `<div class="card" style="border-left: 3px solid transparent; border-image: none; background-image: ${border}; background-size: 3px 100%; background-repeat: no-repeat; background-position: left center; background-clip: border-box; border-left-width: 3px; padding-left: 0; position:relative;">
+    return `<div class="card" style="border-left: 3px solid transparent; position:relative;">
       <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:${border};border-radius:1px 0 0 1px;"></div>
       <div class="card-tap" style="padding-left:15px;" onclick="openFacSheet('${f.id}')">
         <div class="card-top">
@@ -1339,10 +1346,10 @@ function buildGrid() {
       cell.className = 'mcell';
       const cx = MARGIN + c * SPACING;
       const cy = MARGIN + r * SPACING;
-      cell.style.left = (cx - 16) + 'px';
-      cell.style.top  = (cy - 16) + 'px';
-      cell.style.width  = '32px';
-      cell.style.height = '32px';
+      cell.style.left = (cx - SYS_W/2) + 'px';
+      cell.style.top  = (cy - SYS_H/2) + 'px';
+      cell.style.width  = SYS_W + 'px';
+      cell.style.height = SYS_H + 'px';
       cell.dataset.c = c;
       cell.dataset.r = r;
       cell.addEventListener('click', () => handleCellClick(c, r));
@@ -1387,17 +1394,21 @@ function renderMap() {
     node.appendChild(pip);
     node.dataset.key = key;
 
+    // Split name into words, one per line, truncate long words at 15 chars
     const nm = document.createElement('div');
     nm.className = 'mnode-name';
-    nm.textContent = sys?.name || '?';
+    const words = (sys?.name || '?').split(' ');
+    nm.innerHTML = words.map(w => `<div style="width:100%">${w.length > 15 ? w.slice(0,14)+'…' : w}</div>`).join('');
     node.appendChild(nm);
 
-    // port dot if system has port (checking world types)
-    const hasPort = sys && sys.worlds && /port|station|inhabited/i.test(sys.worlds);
-    if (hasPort) {
-      const pd = document.createElement('div');
-      pd.className = 'mnode-port';
-      node.appendChild(pd);
+    // KC / AM info bar
+    if (sys) {
+      const kc = contacts.filter(c => c.system === sys.id && getFacData(c.faction)?.stance !== 'enemy').length;
+      const am = missions.filter(m => m.system === sys.id).length;
+      const bar = document.createElement('div');
+      bar.className = 'mnode-bar';
+      bar.innerHTML = `<span>KC:${kc}</span><span>AM:${am}</span>`;
+      node.appendChild(bar);
     }
 
     node.addEventListener('click', e => { e.stopPropagation(); handleNodeClick(key); });
@@ -1409,19 +1420,48 @@ function renderMap() {
   if (selectedNode) updateStrip(selectedNode);
 }
 
+// Returns the point where the line from (cx,cy) toward (tx,ty) exits the box of half-dims (hw,hh)
+function boxEdgePoint(cx, cy, tx, ty, hw, hh) {
+  const dx = tx - cx, dy = ty - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: cy };
+  // Check each of 4 edges: right, left, bottom, top
+  const candidates = [];
+  if (dx !== 0) {
+    const t = (dx > 0 ? hw : -hw) / dx;
+    const y = dy * t;
+    if (Math.abs(y) <= hh) candidates.push({ t, x: cx + dx*t, y: cy + y });
+  }
+  if (dy !== 0) {
+    const t = (dy > 0 ? hh : -hh) / dy;
+    const x = dx * t;
+    if (Math.abs(x) <= hw) candidates.push({ t, x: cx + x, y: cy + dy*t });
+  }
+  // Pick the candidate with smallest positive t
+  candidates.sort((a,b) => a.t - b.t);
+  const c = candidates.find(p => p.t >= 0) || candidates[0];
+  return { x: c.x, y: c.y };
+}
+
 function renderEdges() {
   const svg = document.getElementById('map-svg');
   svg.innerHTML = '';
 
+  const hw = SYS_W / 2, hh = SYS_H / 2;
+
   mapEdges.forEach((edge, idx) => {
     const [ac, ar] = edge.a.split(',').map(Number);
     const [bc, br] = edge.b.split(',').map(Number);
-    const p1 = cellCenter(ac, ar);
-    const p2 = cellCenter(bc, br);
+    const c1 = cellCenter(ac, ar);
+    const c2 = cellCenter(bc, br);
+
+    // Clip line to box edges
+    const p1 = boxEdgePoint(c1.x, c1.y, c2.x, c2.y, hw, hh);
+    const p2 = boxEdgePoint(c2.x, c2.y, c1.x, c1.y, hw, hh);
 
     const sysA = mapNodes[edge.a] ? systemById(mapNodes[edge.a].sysId) : null;
     const sysB = mapNodes[edge.b] ? systemById(mapNodes[edge.b].sysId) : null;
-    let color = '#2a3d55';
+    // Same-faction lines use faction color, others use a visible neutral gray
+    let color = '#4a6080';
     if (sysA && sysB && sysA.pfac === sysB.pfac && sysA.pfac !== 'unknown') {
       color = factionColor(sysA.pfac);
     }
@@ -1431,35 +1471,43 @@ function renderEdges() {
     line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
     line.setAttribute('stroke', color);
     line.setAttribute('stroke-width', '1.5');
-    line.setAttribute('opacity', '0.55');
-    line.style.cursor = 'pointer';
-    line.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
+    line.setAttribute('opacity', '0.75');
     svg.appendChild(line);
 
-    // Travel time label
-    const mx = (p1.x + p2.x) / 2;
-    const my = (p1.y + p2.y) / 2;
+    // Invisible wide hit target for easier tapping on mobile
+    const hitLine = document.createElementNS('http://www.w3.org/2000/svg','line');
+    hitLine.setAttribute('x1', p1.x); hitLine.setAttribute('y1', p1.y);
+    hitLine.setAttribute('x2', p2.x); hitLine.setAttribute('y2', p2.y);
+    hitLine.setAttribute('stroke', 'transparent');
+    hitLine.setAttribute('stroke-width', '20');
+    hitLine.style.cursor = 'pointer';
+    hitLine.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
+    svg.appendChild(hitLine);
+
+    // Travel time label — rendered after line so it sits on top
     const w = parseInt(edge.weeks)||0;
     const d = parseInt(edge.days)||0;
     if (w || d) {
-      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
-      txt.setAttribute('x', mx);
-      txt.setAttribute('y', my);
-      txt.setAttribute('class', 'tt-label');
-      txt.textContent = `${w}w${d}d`;
+      const mx = (c1.x + c2.x) / 2;
+      const my = (c1.y + c2.y) / 2;
+      const label = `${w}w${d}d`;
+      const labelW = label.length * 6 + 8;
 
-      // background rect
       const bg = document.createElementNS('http://www.w3.org/2000/svg','rect');
-      bg.setAttribute('x', mx-14); bg.setAttribute('y', my-7);
-      bg.setAttribute('width', 28); bg.setAttribute('height', 13);
-      bg.setAttribute('fill', '#0e1117'); bg.setAttribute('rx', 2); bg.setAttribute('opacity','0.8');
-      svg.appendChild(bg);
-      svg.appendChild(txt);
-
-      txt.style.cursor = 'pointer';
+      bg.setAttribute('x', mx - labelW/2); bg.setAttribute('y', my - 7);
+      bg.setAttribute('width', labelW); bg.setAttribute('height', 13);
+      bg.setAttribute('fill', '#0e1117'); bg.setAttribute('rx', 2);
       bg.style.cursor = 'pointer';
-      txt.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
       bg.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
+      svg.appendChild(bg);
+
+      const txt = document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x', mx); txt.setAttribute('y', my);
+      txt.setAttribute('class', 'tt-label');
+      txt.textContent = label;
+      txt.style.cursor = 'pointer';
+      txt.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
+      svg.appendChild(txt);
     }
   });
 }
