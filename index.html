@@ -310,6 +310,13 @@ header {
 .me-det strong { color: var(--text-mid); }
 .me-x { width: 44px; flex-shrink: 0; border-left: 1px solid var(--border); background: transparent; border-top: none; border-right: none; border-bottom: none; color: var(--text-dim); font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .me-x:active { background: rgba(217,64,64,0.1); color: var(--red2); }
+.me-notes { font-family: var(--mono); font-size: 0.58rem; color: var(--text-dim); font-style: italic; line-height: 1.5; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border); white-space: pre-wrap; }
+.toggle-wrap { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+.toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+.toggle-track { position: absolute; inset: 0; background: var(--steel); border: 1px solid var(--border); border-radius: 9px; transition: background 0.2s; cursor: pointer; }
+.toggle-wrap input:checked + .toggle-track { background: var(--teal-dim); border-color: var(--teal); }
+.toggle-thumb { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; background: var(--text-dim); border-radius: 50%; transition: transform 0.2s, background 0.2s; }
+.toggle-wrap input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); background: var(--teal2); }
 
 /* ══════════════════════════════
    CAPTAIN MENU
@@ -579,7 +586,7 @@ header {
 <div class="overlay" id="mis-overlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
-    <div class="sheet-hdr"><span class="sheet-ttl">// Log Mission</span><button class="sheet-x" onclick="closeSheet('mis')">✕</button></div>
+    <div class="sheet-hdr"><span class="sheet-ttl" id="mis-ttl">// Log Mission</span><button class="sheet-x" onclick="closeSheet('mis')">✕</button></div>
     <div class="sheet-body">
       <div class="form-group"><label class="flbl">Mission Name (optional)</label><input class="finput" id="mi-name" placeholder="Optional label" autocomplete="off"></div>
       <div class="form-group">
@@ -587,7 +594,27 @@ header {
         <div class="check-group" id="mi-types"></div>
       </div>
       <div class="frow">
-        <div class="form-group"><label class="flbl">System</label><select class="fselect" id="mi-system"></select></div>
+        <div class="form-group" style="flex:1">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <label class="flbl" style="margin:0">System(s)</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <span style="font-family:var(--mono);font-size:0.54rem;color:var(--text-dim)">Multi</span>
+              <div class="toggle-wrap">
+                <input type="checkbox" id="mi-multi-sys" onchange="toggleMultiSys(this.checked)">
+                <div class="toggle-track"><div class="toggle-thumb"></div></div>
+              </div>
+            </label>
+          </div>
+          <div id="mi-systems-wrap">
+            <select class="fselect" id="mi-system-0" style="margin-bottom:4px"></select>
+            <div id="mi-extra-systems" style="display:none;flex-direction:column;gap:4px;">
+              <select class="fselect" id="mi-system-1"></select>
+              <select class="fselect" id="mi-system-2"></select>
+              <select class="fselect" id="mi-system-3"></select>
+              <select class="fselect" id="mi-system-4"></select>
+            </div>
+          </div>
+        </div>
         <div class="form-group"><label class="flbl">Contact</label><select class="fselect" id="mi-contact"></select></div>
       </div>
       <div class="form-group">
@@ -597,11 +624,12 @@ header {
           <label class="check-item"><input type="checkbox" id="mi-cell"><span>Prison Cell</span></label>
         </div>
       </div>
-      <div class="form-group"><label class="flbl">Notes (optional)</label><textarea class="ftextarea" id="mi-notes" placeholder="Details..." style="min-height:56px;"></textarea></div>
+      <div class="form-group"><label class="flbl">Notes / Objectives</label><textarea class="ftextarea" id="mi-notes" placeholder="Steps, unknowns, intel..." style="min-height:110px;"></textarea></div>
     </div>
     <div class="sheet-foot">
+      <button class="btn-dng" id="mis-del-btn" style="display:none" onclick="deleteMission()">Delete</button>
       <button class="btn-sec" onclick="closeSheet('mis')">Cancel</button>
-      <button class="btn-pri" onclick="saveMission()">Log Mission</button>
+      <button class="btn-pri" onclick="saveMission()">Save Mission</button>
     </div>
   </div>
 </div>
@@ -1292,36 +1320,84 @@ function quickDelCon(id) {
 // ══════════════════════════════════════════
 // MISSIONS
 // ══════════════════════════════════════════
-function openMisSheet() {
-  document.getElementById('mi-name').value = '';
-  document.getElementById('mi-notes').value = '';
-  document.getElementById('mi-cabin').checked = false;
-  document.getElementById('mi-cell').checked = false;
+let editMisId = null;
+
+function toggleMultiSys(on) {
+  const extra = document.getElementById('mi-extra-systems');
+  if (extra) extra.style.display = on ? 'flex' : 'none';
+}
+
+function openMisSheet(id=null) {
+  editMisId = id;
+  const m = id ? missions.find(x=>x.id===id) : null;
+  document.getElementById('mis-ttl').textContent = m ? '// Edit Mission' : '// Log Mission';
+  document.getElementById('mi-name').value = m?.name || '';
+  document.getElementById('mi-notes').value = m?.notes || '';
+  document.getElementById('mi-cabin').checked = m?.cabin || false;
+  document.getElementById('mi-cell').checked = m?.cell || false;
 
   // type checkboxes
-  const tc = document.getElementById('mi-types');
-  tc.innerHTML = MISSION_TYPES.map(t => `
-    <label class="check-item"><input type="checkbox" value="${t}" onchange="this.closest('.check-item').classList.toggle('checked',this.checked)"><span>${t}</span></label>
-  `).join('');
+  const saved = m?.types || [];
+  document.getElementById('mi-types').innerHTML = MISSION_TYPES.map(t => `
+    <label class="check-item ${saved.includes(t)?'checked':''}">
+      <input type="checkbox" value="${t}" ${saved.includes(t)?'checked':''}
+        onchange="this.closest('.check-item').classList.toggle('checked',this.checked)">
+      <span>${t}</span>
+    </label>`).join('');
 
-  document.getElementById('mi-system').innerHTML = sysOptions();
-  document.getElementById('mi-contact').innerHTML = conOptions();
+  // systems — support array or legacy single string
+  const savedSystems = m?.systems || (m?.system ? [m.system] : []);
+  const isMulti = savedSystems.length > 1;
+  const multiChk = document.getElementById('mi-multi-sys');
+  if (multiChk) { multiChk.checked = isMulti; toggleMultiSys(isMulti); }
+
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById(`mi-system-${i}`);
+    if (el) el.innerHTML = sysOptions(savedSystems[i] || '');
+  }
+
+  document.getElementById('mi-contact').innerHTML = conOptions(m?.contact||'');
+
+  const del = document.getElementById('mis-del-btn');
+  del.style.display = id ? '' : 'none';
+
   openSheet('mis');
 }
 
 function saveMission() {
   const types = [...document.querySelectorAll('#mi-types input:checked')].map(el=>el.value);
+  // Collect all selected systems, filtering out blanks
+  const systems = [];
+  for (let i = 0; i < 5; i++) {
+    const el = document.getElementById(`mi-system-${i}`);
+    if (el && el.value) systems.push(el.value);
+  }
   const obj = {
-    id: uid(),
+    id: editMisId || uid(),
     name: document.getElementById('mi-name').value.trim(),
     types,
-    system: document.getElementById('mi-system').value,
+    systems,
+    system: systems[0] || '', // keep legacy field for map compatibility
     contact: document.getElementById('mi-contact').value,
     cabin: document.getElementById('mi-cabin').checked,
     cell: document.getElementById('mi-cell').checked,
     notes: document.getElementById('mi-notes').value.trim()
   };
-  missions.push(obj);
+  if (editMisId) {
+    const i = missions.findIndex(m=>m.id===editMisId);
+    if (i>=0) missions[i] = obj;
+  } else {
+    missions.push(obj);
+  }
+  editMisId = null;
+  saveAll(); closeSheet('mis'); renderMissions();
+}
+
+function deleteMission() {
+  if (!editMisId) return;
+  if (!confirm('Delete this mission?')) return;
+  missions = missions.filter(m=>m.id!==editMisId);
+  editMisId = null;
   saveAll(); closeSheet('mis'); renderMissions();
 }
 
@@ -1341,20 +1417,20 @@ function renderMissions() {
   if (!missions.length) { list.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-txt">No active missions</div></div>`; updateBadge('missions',0); return; }
 
   list.innerHTML = missions.map(m => {
-    const sys = m.system ? systemById(m.system) : null;
+    const sysNames = (m.systems||[m.system]).filter(Boolean).map(id => systemById(id)?.name).filter(Boolean);
     const con = m.contact ? contactById(m.contact) : null;
     const typeStr = m.types.length ? m.types.join(', ') : 'No type';
     const req = [m.cabin?'Cabin':'', m.cell?'Cell':''].filter(Boolean).join(' + ');
     return `<div class="mission-entry">
-      <div class="me-body">
+      <div class="me-body" onclick="openMisSheet('${m.id}')" style="cursor:pointer;">
         <div class="me-type">${typeStr}</div>
         ${m.name?`<div class="me-name">${m.name}</div>`:''}
         <div class="me-details">
-          ${sys?`<span class="me-det"><strong>System</strong> ${sys.name}</span>`:''}
+          ${sysNames.length?`<span class="me-det"><strong>${sysNames.length>1?'Systems':'System'}</strong> ${sysNames.join(' → ')}</span>`:''}
           ${con?`<span class="me-det"><strong>Contact</strong> ${con.name}</span>`:''}
           ${req?`<span class="me-det"><strong>Req</strong> ${req}</span>`:''}
-          ${m.notes?`<span class="me-det">${m.notes}</span>`:''}
         </div>
+        ${m.notes?`<div class="me-notes">${m.notes}</div>`:''}
       </div>
       <button class="me-x" onclick="removeMission('${m.id}')">✕</button>
     </div>`;
