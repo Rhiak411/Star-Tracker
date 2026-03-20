@@ -261,7 +261,7 @@ header {
 
 .map-wrap { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; position: relative; background: var(--bg); border: 1px solid var(--border); }
 .map-canvas { position: relative; transform-origin: top left; }
-#map-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
+#map-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 4; }
 .map-grid { position: absolute; top: 0; left: 0; z-index: 2; }
 .mcell { position: absolute; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .mcell-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--steel); opacity: 0.5; }
@@ -1370,28 +1370,42 @@ let mapScale = 1.0;
 const MAP_SCALE_MIN = 0.3;
 const MAP_SCALE_MAX = 3.0;
 
-function applyMapScale() {
+function applyMapScale(focalX, focalY) {
+  // focalX/Y are the point in the WRAP's coordinate space we want to stay fixed
+  const wrap = document.getElementById('map-wrap');
   const canvas = document.getElementById('map-canvas');
+
+  // Point in canvas-content space before scaling
+  const contentX = (wrap.scrollLeft + focalX) / mapScale;
+  const contentY = (wrap.scrollTop  + focalY) / mapScale;
+
   canvas.style.transform = `scale(${mapScale})`;
-  canvas.style.width = TOTAL_W + 'px';
+  canvas.style.width  = TOTAL_W + 'px';
   canvas.style.height = TOTAL_H + 'px';
-  // Expand a sizer div so the scroll container knows the scaled size
+
+  // Update sizer so scrollbars reflect scaled canvas size
   let sizer = document.getElementById('map-sizer');
   if (!sizer) {
     sizer = document.createElement('div');
     sizer.id = 'map-sizer';
     sizer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
-    document.getElementById('map-wrap').appendChild(sizer);
+    wrap.appendChild(sizer);
   }
-  sizer.style.width = Math.round(TOTAL_W * mapScale) + 'px';
+  sizer.style.width  = Math.round(TOTAL_W * mapScale) + 'px';
   sizer.style.height = Math.round(TOTAL_H * mapScale) + 'px';
+
+  // Scroll so the focal point stays under the same screen position
+  if (focalX !== undefined) {
+    wrap.scrollLeft = contentX * mapScale - focalX;
+    wrap.scrollTop  = contentY * mapScale - focalY;
+  }
 }
 
 function initPinchZoom() {
   const wrap = document.getElementById('map-wrap');
   let lastDist = null;
   let lastScale = 1;
-  let pinchMidX = 0, pinchMidY = 0;
+  let focalX = 0, focalY = 0;
 
   wrap.addEventListener('touchstart', e => {
     if (e.touches.length === 2) {
@@ -1400,8 +1414,10 @@ function initPinchZoom() {
         e.touches[0].clientY - e.touches[1].clientY
       );
       lastScale = mapScale;
-      pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      // focal point relative to the wrap element
+      const rect = wrap.getBoundingClientRect();
+      focalX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+      focalY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
       e.preventDefault();
     }
   }, { passive: false });
@@ -1413,7 +1429,7 @@ function initPinchZoom() {
         e.touches[0].clientY - e.touches[1].clientY
       );
       mapScale = Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, lastScale * (dist / lastDist)));
-      applyMapScale();
+      applyMapScale(focalX, focalY);
       e.preventDefault();
     }
   }, { passive: false });
@@ -1541,6 +1557,7 @@ function renderEdges() {
     hitLine.setAttribute('stroke', 'transparent');
     hitLine.setAttribute('stroke-width', '20');
     hitLine.style.cursor = 'pointer';
+    hitLine.style.pointerEvents = 'all';
     hitLine.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
     svg.appendChild(hitLine);
 
@@ -1558,6 +1575,7 @@ function renderEdges() {
       bg.setAttribute('width', labelW); bg.setAttribute('height', 13);
       bg.setAttribute('fill', '#0e1117'); bg.setAttribute('rx', 2);
       bg.style.cursor = 'pointer';
+      bg.style.pointerEvents = 'all';
       bg.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
       svg.appendChild(bg);
 
@@ -1566,6 +1584,7 @@ function renderEdges() {
       txt.setAttribute('class', 'tt-label');
       txt.textContent = label;
       txt.style.cursor = 'pointer';
+      txt.style.pointerEvents = 'all';
       txt.addEventListener('click', e => { e.stopPropagation(); handleEdgeClick(idx); });
       svg.appendChild(txt);
     }
