@@ -269,15 +269,15 @@ header {
 .mnode:active { opacity: 0.8; }
 .mnode.sel { box-shadow: 0 0 0 2px var(--teal2), 0 0 10px rgba(0,232,248,0.4); }
 .mnode.conn-src { box-shadow: 0 0 0 2px var(--yellow), 0 0 10px rgba(240,192,64,0.4); }
-.mnode-name { font-family: var(--mono); font-size: 0.4rem; color: var(--text-bright); text-align: center; line-height: 1.2; padding: 0 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnode-name { font-family: var(--mono); font-size: 0.38rem; color: var(--text-bright); text-align: center; line-height: 1.2; padding: 0 2px; max-width: 100%; overflow: hidden; word-break: break-word; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .mnode-port { width: 4px; height: 4px; border-radius: 50%; background: var(--teal2); flex-shrink: 0; }
 .mnode-hz { position: absolute; bottom: 1px; right: 2px; width: 4px; height: 4px; border-radius: 50%; }
 
 /* bottom info strip */
-.map-strip { flex-shrink: 0; display: flex; align-items: center; gap: 0; height: 34px; background: var(--bg2); border-top: 1px solid var(--border); overflow: hidden; }
+.map-strip { flex-shrink: 0; display: flex; align-items: center; gap: 0; height: 44px; background: var(--bg2); border-top: 1px solid var(--border); overflow: hidden; }
 .strip-cell { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 4px; border-right: 1px solid var(--border); height: 100%; overflow: hidden; }
 .strip-cell:last-child { border-right: none; }
-.strip-name { font-family: var(--mono); font-size: 0.55rem; color: var(--text-bright); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.strip-name { font-family: var(--mono); font-size: 0.52rem; color: var(--text-bright); overflow: hidden; text-align: center; line-height: 1.3; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .strip-faction { font-family: var(--mono); font-size: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .strip-yn { font-family: var(--display); font-size: 0.6rem; font-weight: 700; }
 .strip-lbl { font-family: var(--mono); font-size: 0.42rem; color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1px; }
@@ -329,6 +329,13 @@ header {
 .cap-add-btn { padding: 10px 14px; background: var(--teal); border: none; color: var(--bg); font-family: var(--display); font-size: 0.6rem; letter-spacing: 0.1em; cursor: pointer; border-radius: 1px; font-weight: 700; }
 .cap-menu-bg { display: none; position: fixed; inset: 0; z-index: 79; }
 .cap-menu-bg.open { display: block; }
+.cap-io { display: flex; gap: 6px; margin: 0 8px 6px; }
+.cap-io-btn { flex: 1; padding: 10px 8px; background: var(--steel); border: 1px solid var(--border); color: var(--text-mid); font-family: var(--display); font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; border-radius: 1px; text-align: center; display: flex; align-items: center; justify-content: center; }
+.cap-io-btn.export { border-color: var(--teal-dim); color: var(--teal); }
+.cap-io-btn.export:active { background: rgba(0,200,212,0.1); }
+.cap-io-btn.import { border-color: var(--gold); color: var(--gold2); }
+.cap-io-btn.import:active { background: rgba(200,146,42,0.1); }
+.cap-io-note { font-family: var(--mono); font-size: 0.54rem; color: var(--green); text-align: center; padding: 0 8px 10px; min-height: 20px; }
 
 /* FACTIONS special */
 .faction-banner { width: 12px; height: 18px; border-radius: 1px; flex-shrink: 0; display: inline-block; }
@@ -453,6 +460,14 @@ header {
     <input id="cap-input" placeholder="New captain name..." maxlength="32">
     <button class="cap-add-btn" onclick="addCaptain()">Add</button>
   </div>
+  <div class="cap-io">
+    <button class="cap-io-btn export" onclick="exportData()">⬇ Export JSON</button>
+    <label class="cap-io-btn import">
+      ⬆ Import JSON
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importData(event)">
+    </label>
+  </div>
+  <div class="cap-io-note" id="cap-io-note"></div>
 </div>
 
 <!-- SYSTEM SHEET -->
@@ -608,10 +623,14 @@ header {
 // ══════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════
-const GRID = 59;       // canvas grid size (systems on odd coords)
-const CELL = 22;       // px per grid cell
-const SYS_W = 38;      // node width px
-const SYS_H = 34;      // node height px
+const COLS = 30;       // number of placeable system columns
+const ROWS = 30;       // number of placeable system rows
+const SPACING = 64;    // px between system centers
+const SYS_W = 52;      // node width px
+const SYS_H = 42;      // node height px
+const MARGIN = 10;     // px margin around the grid
+const TOTAL_W = MARGIN * 2 + COLS * SPACING;
+const TOTAL_H = MARGIN * 2 + ROWS * SPACING;
 
 const FACTIONS = [
   { id:'javat',      name:'Clan Javat',          color:'#28a050', color2:'#00c8d4', group:'house' },
@@ -682,7 +701,12 @@ function lsKey(k) { return `stf3_${currentCaptain}_${k}`; }
 function saveAll() {
   if (!currentCaptain) return;
   const d = { systems, factions, contacts, missions, mapNodes, mapEdges, nextId };
-  try { localStorage.setItem(lsKey('data'), JSON.stringify(d)); } catch(e){}
+  try {
+    localStorage.setItem(lsKey('data'), JSON.stringify(d));
+  } catch(e) {
+    console.error('STF save failed:', e);
+    alert('Warning: data could not be saved. Your browser storage may be full or restricted.');
+  }
 }
 
 function loadAll() {
@@ -704,6 +728,81 @@ function loadAll() {
 
 function saveCaptains() {
   try { localStorage.setItem('stf3_captains', JSON.stringify({ captains, currentCaptain })); } catch(e){}
+}
+
+// ══════════════════════════════════════════
+// EXPORT / IMPORT
+// ══════════════════════════════════════════
+function exportData() {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    captains,
+    currentCaptain,
+    data: {}
+  };
+  // Export all captains' data
+  captains.forEach(cap => {
+    try {
+      const raw = localStorage.getItem(`stf3_${cap}_data`);
+      if (raw) payload.data[cap] = JSON.parse(raw);
+    } catch(e) {}
+  });
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `stf-command-log-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showIoNote('✓ Exported to Downloads');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const payload = JSON.parse(e.target.result);
+      if (!payload.version || !payload.captains || !payload.data) {
+        showIoNote('✗ Invalid file format', true); return;
+      }
+      // Restore all captains
+      payload.captains.forEach(cap => {
+        if (!captains.includes(cap)) captains.push(cap);
+        if (payload.data[cap]) {
+          try { localStorage.setItem(`stf3_${cap}_data`, JSON.stringify(payload.data[cap])); } catch(e){}
+        }
+      });
+      currentCaptain = payload.currentCaptain || captains[0];
+      saveCaptains();
+      loadAll();
+      document.getElementById('cap-display').textContent = currentCaptain;
+      renderAll();
+      buildGrid();
+      showIoNote('✓ Import successful');
+    } catch(e) {
+      showIoNote('✗ Could not read file', true);
+    }
+    // Reset file input so same file can be re-imported if needed
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function showIoNote(msg, isError=false) {
+  const el = document.getElementById('cap-io-note');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--red2)' : 'var(--green)';
+  setTimeout(() => { el.textContent = ''; }, 3000);
 }
 
 function loadCaptains() {
@@ -862,6 +961,7 @@ function populateFacSelects() {
 // SYSTEMS
 // ══════════════════════════════════════════
 let editSysId = null;
+let mapPlacingKey = null;
 
 function openSysSheet(id=null) {
   editSysId = id;
@@ -893,8 +993,9 @@ function saveSystem() {
   const name = document.getElementById('s-name').value.trim();
   if (!name) { alert('System name required.'); return; }
   const sfacs = [...document.querySelectorAll('#s-sfac-checks input:checked')].map(el => el.value);
+  const newId = editSysId || uid();
   const obj = {
-    id: editSysId || uid(),
+    id: newId,
     name,
     pfac: document.getElementById('s-pfac').value,
     sfacs,
@@ -903,6 +1004,11 @@ function saveSystem() {
   };
   if (editSysId) { const i = systems.findIndex(s=>s.id===editSysId); if(i>=0) systems[i]=obj; }
   else systems.push(obj);
+  // Place on map if triggered from map tap
+  if (mapPlacingKey && !editSysId) {
+    mapNodes[mapPlacingKey] = { sysId: newId };
+  }
+  mapPlacingKey = null;
   saveAll(); closeSheet('sys'); renderAll(); renderMap();
 }
 
@@ -924,10 +1030,15 @@ function renderSystems() {
   list.innerHTML = systems.map(s => {
     const id = 'sys-'+s.id;
     const fc = factionColor(s.pfac);
+    const f2 = factionById(s.pfac);
+    const fc2 = f2?.color2 || fc;
+    const borderStyle = `border-left:3px solid transparent;position:relative;`;
+    const pipHtml = `<div style="position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(to bottom,${fc} 50%,${fc2} 50%);border-radius:1px 0 0 1px;pointer-events:none;z-index:1;"></div>`;
     const fn = factionName(s.pfac);
     const ccount = contacts.filter(c => c.system===s.id && factionById(c.faction)?.id !== 'enemy').length;
     const sfacNames = (s.sfacs||[]).map(f=>factionName(f)).join(', ');
-    return `<div class="card" style="border-left-color:${fc}">
+    return `<div class="card" style="${borderStyle}">
+      ${pipHtml}
       <div class="card-tap" onclick="toggleCard('${id}')">
         <div class="card-top">
           <div><div class="card-name">${s.name}</div><div class="card-sub">${fn}</div></div>
@@ -1079,9 +1190,14 @@ function renderContacts() {
   list.innerHTML = sorted.map(c => {
     const id = 'con-'+c.id;
     const fi = factionById(c.faction);
+    const fc2c = fi?.color2 || fi?.color || '#2a3545';
+    const fcc = fi?.color || '#2a3545';
+    const conBorderStyle = `border-left:3px solid transparent;position:relative;`;
+    const conPip = `<div style="position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(to bottom,${fcc} 50%,${fc2c} 50%);border-radius:1px 0 0 1px;pointer-events:none;z-index:1;"></div>`;
     const sys = c.system ? systemById(c.system) : null;
     const isEnemy = getFacData(c.faction)?.stance === 'enemy';
-    return `<div class="card" style="border-left-color:${fi?.color||'#2a3545'}">
+    return `<div class="card" style="${conBorderStyle}">
+      ${conPip}
       <div class="card-tap" onclick="toggleCard('${id}')">
         <div class="card-top">
           <div>
@@ -1201,43 +1317,38 @@ let selectedNode = null;
 let pendingEdge = null; // {a, b} waiting for travel time
 let editingEdgeIdx = null;
 
-const TOTAL = GRID * CELL;
-
 function buildGrid() {
   const canvas = document.getElementById('map-canvas');
   const svg = document.getElementById('map-svg');
   const grid = document.getElementById('map-grid');
-  canvas.style.width = TOTAL + 'px';
-  canvas.style.height = TOTAL + 'px';
-  svg.setAttribute('width', TOTAL);
-  svg.setAttribute('height', TOTAL);
-  svg.style.width = TOTAL + 'px';
-  svg.style.height = TOTAL + 'px';
-  grid.style.width = TOTAL + 'px';
-  grid.style.height = TOTAL + 'px';
+
+  canvas.style.width = TOTAL_W + 'px';
+  canvas.style.height = TOTAL_H + 'px';
+  svg.setAttribute('width', TOTAL_W);
+  svg.setAttribute('height', TOTAL_H);
+  svg.style.width = TOTAL_W + 'px';
+  svg.style.height = TOTAL_H + 'px';
+  grid.style.width = TOTAL_W + 'px';
+  grid.style.height = TOTAL_H + 'px';
 
   grid.innerHTML = '';
-  // Only place cells at odd grid coordinates (system positions)
-  // and show dots at all positions
-  for (let r = 0; r < GRID; r++) {
-    for (let c = 0; c < GRID; c++) {
+  // One clickable cell per system position, no empty buffer cells
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
       const cell = document.createElement('div');
       cell.className = 'mcell';
-      cell.style.left = c * CELL + 'px';
-      cell.style.top = r * CELL + 'px';
-      cell.style.width = CELL + 'px';
-      cell.style.height = CELL + 'px';
-
-      const isSystemPos = (c % 2 === 1) && (r % 2 === 1);
-      if (isSystemPos) {
-        cell.dataset.c = c;
-        cell.dataset.r = r;
-        cell.addEventListener('click', () => handleCellClick(c, r));
-        // small dot as placeholder
-        const dot = document.createElement('div');
-        dot.className = 'mcell-dot';
-        cell.appendChild(dot);
-      }
+      const cx = MARGIN + c * SPACING;
+      const cy = MARGIN + r * SPACING;
+      cell.style.left = (cx - 16) + 'px';
+      cell.style.top  = (cy - 16) + 'px';
+      cell.style.width  = '32px';
+      cell.style.height = '32px';
+      cell.dataset.c = c;
+      cell.dataset.r = r;
+      cell.addEventListener('click', () => handleCellClick(c, r));
+      const dot = document.createElement('div');
+      dot.className = 'mcell-dot';
+      cell.appendChild(dot);
       grid.appendChild(cell);
     }
   }
@@ -1246,7 +1357,7 @@ function buildGrid() {
 }
 
 function cellCenter(c, r) {
-  return { x: c * CELL + CELL/2, y: r * CELL + CELL/2 };
+  return { x: MARGIN + c * SPACING, y: MARGIN + r * SPACING };
 }
 
 function renderMap() {
@@ -1262,11 +1373,18 @@ function renderMap() {
 
     const node = document.createElement('div');
     node.className = 'mnode' + (key===selectedNode?' sel':'') + (key===connectSrc?' conn-src':'');
-    node.style.left = (c * CELL + (CELL - SYS_W)/2) + 'px';
-    node.style.top = (r * CELL + (CELL - SYS_H)/2) + 'px';
+    node.style.left = (MARGIN + c * SPACING - SYS_W/2) + 'px';
+    node.style.top  = (MARGIN + r * SPACING - SYS_H/2) + 'px';
     node.style.width = SYS_W + 'px';
     node.style.height = SYS_H + 'px';
+    // Two-tone top border via pseudo — use outline trick with a gradient overlay div
     node.style.borderTop = `3px solid ${fc}`;
+    // Add two-tone left pip
+    const pip = document.createElement('div');
+    const f2 = sys ? factionById(sys.pfac) : null;
+    const fc2 = f2?.color2 || fc;
+    pip.style.cssText = `position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(to bottom,${fc} 50%,${fc2} 50%);border-radius:1px 0 0 1px;pointer-events:none;`;
+    node.appendChild(pip);
     node.dataset.key = key;
 
     const nm = document.createElement('div');
@@ -1425,34 +1543,6 @@ function openNodeAssignSheet(key) {
   mapPlacingKey = key;
   openSysSheet(null);
   // after save, placeSystemOnMap will be called
-}
-
-let mapPlacingKey = null;
-const _origSaveSystem = saveSystem;
-
-// Override saveSystem to also place on map when placing
-function saveSystem() {
-  const name = document.getElementById('s-name').value.trim();
-  if (!name) { alert('System name required.'); return; }
-  const sfacs = [...document.querySelectorAll('#s-sfac-checks input:checked')].map(el=>el.value);
-  const obj = {
-    id: editSysId || uid(),
-    name,
-    pfac: document.getElementById('s-pfac').value,
-    sfacs,
-    worlds: document.getElementById('s-worlds').value.trim(),
-    notes: document.getElementById('s-notes').value.trim()
-  };
-  if (editSysId) { const i=systems.findIndex(s=>s.id===editSysId); if(i>=0) systems[i]=obj; }
-  else systems.push(obj);
-
-  // If we were placing from map, put it there
-  if (mapPlacingKey && !editSysId) {
-    mapNodes[mapPlacingKey] = { sysId: obj.id };
-  }
-  mapPlacingKey = null;
-
-  saveAll(); closeSheet('sys'); renderAll(); renderMap();
 }
 
 // System detail sheet (view from map tap)
@@ -1659,7 +1749,12 @@ if (captains.length && currentCaptain) {
   loadAll();
   document.getElementById('cap-display').textContent = currentCaptain;
 } else {
+  // No captains yet — create a default so data always has somewhere to save
+  currentCaptain = 'Captain';
+  captains = ['Captain'];
+  saveCaptains();
   initFactions();
+  document.getElementById('cap-display').textContent = currentCaptain;
 }
 initNav();
 renderAll();
