@@ -557,7 +557,15 @@ header {
         <div class="form-group"><label class="flbl">Faction</label><select class="fselect" id="c-faction"></select></div>
         <div class="form-group"><label class="flbl">Home System</label><select class="fselect" id="c-system"></select></div>
       </div>
-      <div class="form-group"><label class="flbl">Notes</label><textarea class="ftextarea" id="c-notes" placeholder="Interactions, tips..."></textarea></div>
+      <div class="form-group">
+        <label class="flbl">Interactions</label>
+        <div class="check-group" id="c-interactions"></div>
+      </div>
+      <div class="form-group">
+        <label class="flbl">Recruits</label>
+        <div class="check-group" id="c-recruits"></div>
+      </div>
+      <div class="form-group"><label class="flbl">Notes</label><textarea class="ftextarea" id="c-notes" placeholder="Tips, details..."></textarea></div>
     </div>
     <div class="sheet-foot" id="con-foot">
       <button class="btn-dng" id="con-del-btn" style="display:none" onclick="deleteContact()">Delete</button>
@@ -671,6 +679,20 @@ const CONTACT_ROLES = [
 ];
 
 const MISSION_TYPES = ['Ship Combat','Crew Combat','Explore','Patrol','Blockade','Spy','Salvage','Transport'];
+
+const CONTACT_INTERACTIONS = [
+  'Military Rank','Trade Permit','Issue Edict','Pardon','Black Market Access',
+  'Purchase Intel','Purchase Scientific Data','Sell Equipment','Sell Rumors','Give Introductions'
+];
+
+const RECRUIT_TYPES = [
+  'Assassin','Blade Dancer','Bodyguard','Bounty Hunter','Combat Medic','Commander',
+  'Diplomat','Doctor','Electronics Tech','Engineer','Exo Scout','Explorer',
+  'Gundeck Boss','Mechanic','Merchant','Military Officer','Navigator','Pilot',
+  'Pirate','Pistolier','Quartermaster','Saboteur','Scavenger','Scientist',
+  'Shock Trooper','Smuggler','Sniper','Soldier','Spy','Swordsman',
+  'Wing Bomber','Wing Commando','Wing Leader','Wing Tech','Xeno Hunter','Zealot'
+];
 
 const STANCES = { ally:'Ally', friendly:'Friendly', neutral:'Neutral', enemy:'Enemy' };
 const STANCE_BADGE = { ally:'b-green', friendly:'b-teal', neutral:'b-steel', enemy:'b-red' };
@@ -1040,8 +1062,9 @@ function deleteSystem() {
 
 function renderSystems() {
   const list = document.getElementById('sys-list');
-  if (!systems.length) { list.innerHTML = `<div class="empty"><div class="empty-icon">🌐</div><div class="empty-txt">No systems logged</div></div>`; updateBadge('systems',0); return; }
-  list.innerHTML = systems.map(s => {
+  const sorted = [...systems].sort((a,b) => a.name.localeCompare(b.name));
+  if (!sorted.length) { list.innerHTML = `<div class="empty"><div class="empty-icon">🌐</div><div class="empty-txt">No systems logged</div></div>`; updateBadge('systems',0); return; }
+  list.innerHTML = sorted.map(s => {
     const id = 'sys-'+s.id;
     const fc = factionColor(s.pfac);
     const f2 = factionById(s.pfac);
@@ -1156,6 +1179,24 @@ function openConSheet(id=null) {
   // system dropdown
   document.getElementById('c-system').innerHTML = sysOptions(c?.system||'');
 
+  // interactions checkboxes
+  const saved_i = c?.interactions || [];
+  document.getElementById('c-interactions').innerHTML = CONTACT_INTERACTIONS.map(x => `
+    <label class="check-item ${saved_i.includes(x)?'checked':''}">
+      <input type="checkbox" value="${x}" ${saved_i.includes(x)?'checked':''}
+        onchange="this.closest('.check-item').classList.toggle('checked',this.checked)">
+      <span>${x}</span>
+    </label>`).join('');
+
+  // recruits checkboxes
+  const saved_r = c?.recruits || [];
+  document.getElementById('c-recruits').innerHTML = RECRUIT_TYPES.map(x => `
+    <label class="check-item ${saved_r.includes(x)?'checked':''}">
+      <input type="checkbox" value="${x}" ${saved_r.includes(x)?'checked':''}
+        onchange="this.closest('.check-item').classList.toggle('checked',this.checked)">
+      <span>${x}</span>
+    </label>`).join('');
+
   const del = document.getElementById('con-del-btn');
   del.style.display = id ? '' : 'none';
   openSheet('con');
@@ -1165,6 +1206,8 @@ function openConSheet(id=null) {
 function saveContact() {
   const name = document.getElementById('c-name').value.trim();
   if (!name) { alert('Name required.'); return; }
+  const interactions = [...document.querySelectorAll('#c-interactions input:checked')].map(el=>el.value);
+  const recruits = [...document.querySelectorAll('#c-recruits input:checked')].map(el=>el.value);
   const obj = {
     id: editConId || uid(),
     name,
@@ -1172,6 +1215,8 @@ function saveContact() {
     faction: document.getElementById('c-faction').value,
     system: document.getElementById('c-system').value,
     frequent: document.getElementById('c-freq').checked,
+    interactions,
+    recruits,
     notes: document.getElementById('c-notes').value.trim()
   };
   if (editConId) { const i=contacts.findIndex(c=>c.id===editConId); if(i>=0) contacts[i]=obj; }
@@ -1225,6 +1270,8 @@ function renderContacts() {
         ${drow('Role', c.role)}
         ${drow('Faction', fi?.name)}
         ${drow('System', sys?.name)}
+        ${(c.interactions||[]).length ? `<div class="drow"><span class="dlbl">Interactions</span><span class="dval">${(c.interactions||[]).map(x=>`<span class="badge b-teal" style="margin:1px 2px">${x}</span>`).join('')}</span></div>` : ''}
+        ${(c.recruits||[]).length ? `<div class="drow"><span class="dlbl">Recruits</span><span class="dval">${(c.recruits||[]).map(x=>`<span class="badge b-steel" style="margin:1px 2px">${x}</span>`).join('')}</span></div>` : ''}
         ${c.notes?`<div class="nbox">${c.notes}</div>`:''}
       </div>
       <div class="card-bar">
@@ -1371,19 +1418,20 @@ const MAP_SCALE_MIN = 0.3;
 const MAP_SCALE_MAX = 3.0;
 
 function applyMapScale(focalX, focalY) {
-  // focalX/Y are the point in the WRAP's coordinate space we want to stay fixed
   const wrap = document.getElementById('map-wrap');
   const canvas = document.getElementById('map-canvas');
 
-  // Point in canvas-content space before scaling
-  const contentX = (wrap.scrollLeft + focalX) / mapScale;
-  const contentY = (wrap.scrollTop  + focalY) / mapScale;
+  // Save the content-space point under the focal position before scaling
+  const scrollX = wrap.scrollLeft;
+  const scrollY = wrap.scrollTop;
+  const contentX = (scrollX + (focalX || 0)) / (mapScale || 1);
+  const contentY = (scrollY + (focalY || 0)) / (mapScale || 1);
 
   canvas.style.transform = `scale(${mapScale})`;
   canvas.style.width  = TOTAL_W + 'px';
   canvas.style.height = TOTAL_H + 'px';
 
-  // Update sizer so scrollbars reflect scaled canvas size
+  // Sizer keeps scrollbars correct for scaled canvas
   let sizer = document.getElementById('map-sizer');
   if (!sizer) {
     sizer = document.createElement('div');
@@ -1391,10 +1439,10 @@ function applyMapScale(focalX, focalY) {
     sizer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
     wrap.appendChild(sizer);
   }
-  sizer.style.width  = Math.round(TOTAL_W * mapScale) + 'px';
+  sizer.style.width  = Math.round(TOTAL_W  * mapScale) + 'px';
   sizer.style.height = Math.round(TOTAL_H * mapScale) + 'px';
 
-  // Scroll so the focal point stays under the same screen position
+  // Re-scroll so the focal content point stays under the same screen position
   if (focalX !== undefined) {
     wrap.scrollLeft = contentX * mapScale - focalX;
     wrap.scrollTop  = contentY * mapScale - focalY;
@@ -1414,10 +1462,10 @@ function initPinchZoom() {
         e.touches[0].clientY - e.touches[1].clientY
       );
       lastScale = mapScale;
-      // focal point relative to the wrap element
+      // Focal point in wrap-local coordinates (accounting for wrap's position on screen)
       const rect = wrap.getBoundingClientRect();
-      focalX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
-      focalY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+      focalX = ((e.touches[0].clientX + e.touches[1].clientX) / 2) - rect.left;
+      focalY = ((e.touches[0].clientY + e.touches[1].clientY) / 2) - rect.top;
       e.preventDefault();
     }
   }, { passive: false });
@@ -1428,8 +1476,11 @@ function initPinchZoom() {
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
-      mapScale = Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, lastScale * (dist / lastDist)));
-      applyMapScale(focalX, focalY);
+      const newScale = Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, lastScale * (dist / lastDist)));
+      if (newScale !== mapScale) {
+        mapScale = newScale;
+        applyMapScale(focalX, focalY);
+      }
       e.preventDefault();
     }
   }, { passive: false });
