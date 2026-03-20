@@ -260,7 +260,7 @@ header {
 .map-hint { font-family: var(--mono); font-size: 0.54rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; text-align: right; }
 
 .map-wrap { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; position: relative; background: var(--bg); border: 1px solid var(--border); }
-.map-canvas { position: relative; }
+.map-canvas { position: relative; transform-origin: top left; }
 #map-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1; }
 .map-grid { position: absolute; top: 0; left: 0; z-index: 2; }
 .mcell { position: absolute; display: flex; align-items: center; justify-content: center; cursor: pointer; }
@@ -269,8 +269,8 @@ header {
 .mnode:active { opacity: 0.8; }
 .mnode.sel { box-shadow: 0 0 0 2px var(--teal2), 0 0 10px rgba(0,232,248,0.4); }
 .mnode.conn-src { box-shadow: 0 0 0 2px var(--yellow), 0 0 10px rgba(240,192,64,0.4); }
-.mnode-name { font-family: var(--mono); font-size: 0.52rem; color: var(--text-bright); text-align: center; line-height: 1.35; padding: 3px 4px 3px 7px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
-.mnode-bar { flex-shrink: 0; display: flex; justify-content: space-between; padding: 1px 4px 2px 7px; font-family: var(--mono); font-size: 0.42rem; color: var(--text-dim); border-top: 1px solid rgba(42,61,85,0.8); background: rgba(14,17,23,0.6); line-height: 1.5; }
+.mnode-name { font-family: var(--mono); font-size: 0.42rem; color: var(--text-bright); text-align: center; line-height: 1.3; padding: 2px 3px 2px 6px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; }
+.mnode-bar { flex-shrink: 0; display: flex; justify-content: space-between; padding: 1px 3px 1px 6px; font-family: var(--mono); font-size: 0.36rem; color: var(--text-dim); border-top: 1px solid rgba(42,61,85,0.8); background: rgba(14,17,23,0.6); line-height: 1.4; }
 .mnode-port { width: 4px; height: 4px; border-radius: 50%; background: var(--teal2); flex-shrink: 0; }
 .mnode-hz { position: absolute; bottom: 1px; right: 2px; width: 4px; height: 4px; border-radius: 50%; }
 
@@ -626,10 +626,10 @@ header {
 // ══════════════════════════════════════════
 const COLS = 30;       // number of placeable system columns
 const ROWS = 30;       // number of placeable system rows
-const SPACING = 124;   // px between system centers
-const SYS_W = 80;      // node width px
-const SYS_H = 64;      // node height px — tall enough for 3 lines + info bar
-const MARGIN = 50;     // px margin — keeps edge nodes fully visible
+const SPACING = 86;    // px between system centers — ~4 nodes visible on phone
+const SYS_W = 54;      // node width px
+const SYS_H = 44;      // node height px
+const MARGIN = 30;     // px margin — keeps edge nodes fully visible
 const TOTAL_W = MARGIN * 2 + (COLS - 1) * SPACING;
 const TOTAL_H = MARGIN * 2 + (ROWS - 1) * SPACING;
 
@@ -1363,6 +1363,66 @@ function buildGrid() {
   buildLegend();
 }
 
+// ══════════════════════════════════════════
+// PINCH TO ZOOM
+// ══════════════════════════════════════════
+let mapScale = 1.0;
+const MAP_SCALE_MIN = 0.3;
+const MAP_SCALE_MAX = 3.0;
+
+function applyMapScale() {
+  const canvas = document.getElementById('map-canvas');
+  canvas.style.transform = `scale(${mapScale})`;
+  canvas.style.width = TOTAL_W + 'px';
+  canvas.style.height = TOTAL_H + 'px';
+  // Expand a sizer div so the scroll container knows the scaled size
+  let sizer = document.getElementById('map-sizer');
+  if (!sizer) {
+    sizer = document.createElement('div');
+    sizer.id = 'map-sizer';
+    sizer.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    document.getElementById('map-wrap').appendChild(sizer);
+  }
+  sizer.style.width = Math.round(TOTAL_W * mapScale) + 'px';
+  sizer.style.height = Math.round(TOTAL_H * mapScale) + 'px';
+}
+
+function initPinchZoom() {
+  const wrap = document.getElementById('map-wrap');
+  let lastDist = null;
+  let lastScale = 1;
+  let pinchMidX = 0, pinchMidY = 0;
+
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      lastDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      lastScale = mapScale;
+      pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  wrap.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && lastDist) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      mapScale = Math.min(MAP_SCALE_MAX, Math.max(MAP_SCALE_MIN, lastScale * (dist / lastDist)));
+      applyMapScale();
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  wrap.addEventListener('touchend', e => {
+    if (e.touches.length < 2) lastDist = null;
+  });
+}
+
 function cellCenter(c, r) {
   return { x: MARGIN + c * SPACING, y: MARGIN + r * SPACING };
 }
@@ -1807,6 +1867,7 @@ if (captains.length && currentCaptain) {
 initNav();
 renderAll();
 buildGrid();
+initPinchZoom();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
